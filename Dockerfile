@@ -1,18 +1,35 @@
-FROM registry.hf.space/microsoft-omniparser-v2:latest
+FROM nvidia/cuda:12.2.2-cudnn8-runtime-ubuntu22.04
+ARG OMNIPARSER_RELASE=v.2.0.0
+ARG USERNAME=user
+ARG USER_UID=1000
+ARG USER_GID=$USER_UID
 
 USER root
 
-RUN chmod 1777 /tmp \
-    && apt update -q && apt install -y ca-certificates wget libgl1 \
-    && wget -qO /tmp/cuda-keyring.deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.1-1_all.deb \
-    && dpkg -i /tmp/cuda-keyring.deb && apt update -q \
-    && apt install -y --no-install-recommends libcudnn8 libcublas-12-2
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+  --mount=type=cache,target=/var/lib/apt,sharing=locked \
+  apt update -q && apt install -y --no-install-recommends git curl python3 python3-pip sudo libgl1-mesa-glx libglib2.0-0
 
+# download the repository
+RUN curl -OL https://github.com/microsoft/OmniParser/archive/refs/tags/${OMNIPARSER_RELASE}.tar.gz \
+    && tar -xvf ${OMNIPARSER_RELASE}.tar.gz \
+    && rm ${OMNIPARSER_RELASE}.tar.gz \
+    && mv OmniParser-${OMNIPARSER_RELASE} /opt/omniparser
 
-USER user
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install -r /opt/omniparser/requirements.txt
 
-RUN pip install fastapi[all]
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install fastapi[all] loguru
 
+ENV PYTHONPATH=/opt/omniparser:$PYTHONPATH
+
+RUN mkdir -p /root/.cache/huggingface \
+    && mkdir -p /root/.config/matplotlib \
+    && mkdir -p /root/.paddleocr \
+    && mkdir -p /root/.EasyOCR
+
+WORKDIR /app
 
 COPY main.py main.py
 

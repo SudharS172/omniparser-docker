@@ -1,20 +1,16 @@
 from fastapi import FastAPI, File, UploadFile, HTTPException
-from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from typing import Optional
-import spaces
-import numpy as np
-import torch
-from PIL import Image
 import io
 import json
 
 import base64, os
-from util.utils import check_ocr_box, get_yolo_model, get_caption_model_processor, get_som_labeled_img
+from utils import check_ocr_box, get_yolo_model, get_caption_model_processor, get_som_labeled_img
 import torch
 from PIL import Image
 
 from huggingface_hub import snapshot_download
+from loguru import logger
 
 # Define repository and local directory
 repo_id = "microsoft/OmniParser-v2.0"  # HF repo
@@ -52,7 +48,6 @@ class ProcessResponse(BaseModel):
     parsed_content_list: str
     label_coordinates: str
 
-@spaces.GPU
 @torch.inference_mode()
 # @torch.autocast(device_type="cuda", dtype=torch.bfloat16)
 def process(
@@ -61,11 +56,7 @@ def process(
     iou_threshold,
     use_paddleocr,
     imgsz
-) -> Optional[Image.Image]:
-
-    # image_save_path = 'imgs/saved_image_demo.png'
-    # image_input.save(image_save_path)
-    # image = Image.open(image_save_path)
+) -> Optional[ProcessResponse]:
     box_overlay_ratio = image_input.size[0] / 3200
     draw_bbox_config = {
         'text_scale': 0.8 * box_overlay_ratio,
