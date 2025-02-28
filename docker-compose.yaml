@@ -1,0 +1,14 @@
+services:
+  omniparser:
+    build:
+      context: ./
+      dockerfile: Dockerfile
+    ports:
+      - 7860:7860
+    ipc: host
+    volumes:
+      - ~/.cache/huggingface:/home/user/.cache/huggingface
+      - ~/.paddleocr:/home/user/.paddleocr
+      - ~/.EasyOCR/:/home/user/.EasyOCR
+    environment:
+      - HUGGING_FACE_HUB_TOKEN=${HUGGING_FACE_HUB_TOKEN}

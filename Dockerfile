@@ -1,4 +1,4 @@
-FROM registry.hf.space/microsoft-omniparser:latest
+FROM registry.hf.space/microsoft-omniparser-v2:latest
 
 USER root
 
@@ -8,9 +8,12 @@ RUN chmod 1777 /tmp \
     && dpkg -i /tmp/cuda-keyring.deb && apt update -q \
     && apt install -y --no-install-recommends libcudnn8 libcublas-12-2
 
-RUN pip install fastapi[all] 
+
+USER user
+
+RUN pip install fastapi[all]
 
 
 COPY main.py main.py
-RUN python main.py
+
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "7860"]
