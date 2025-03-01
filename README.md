@@ -29,7 +29,11 @@ If you look at the Dockerfile, we start off with the HF demo image to retrive al
     mkdir -p ~/.EasyOCR
     mkdir -p ~/.paddleocr
     ```
-1. Clone the repository
+2. Clone the repository:
+   ```shell
+   git clone https://github.com/lokkju/omniparser-api-v2.git && 
+   git submodule update --init --recursive
+   ```
 2. Build the docker image: `docker compose build`
 3. Run the docker container: `docker compose up -d`
 
