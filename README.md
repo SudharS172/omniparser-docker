@@ -23,7 +23,12 @@ If you look at the Dockerfile, we start off with the HF demo image to retrive al
 - 16 GB Ram (swap recommended)
 
 ### Locally
-
+1. create cache directories
+    ```shell
+    mkdir -p ~/.cache/huggingface \
+    mkdir -p ~/.EasyOCR \
+    mkdir -p ~/.paddleocr
+    ```
 1. Clone the repository
 2. Build the docker image: `docker compose build`
 3. Run the docker container: `docker compose up -d`
