@@ -31,11 +31,11 @@ If you look at the Dockerfile, we start off with the HF demo image to retrive al
     ```
 2. Clone the repository:
    ```shell
-   git clone https://github.com/lokkju/omniparser-api-v2.git && 
+   git clone https://github.com/lokkju/omniparser-api-v2.git
    git submodule update --init --recursive
    ```
-2. Build the docker image: `docker compose build`
-3. Run the docker container: `docker compose up -d`
+2. Build the docker image: `docker compose --profile omniparser-cpu build`
+3. Run the docker container: `docker compose --profile omniparser-cpu up -d`
 
 ### Self-hosted API
 

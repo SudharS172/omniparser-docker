@@ -1,5 +1,7 @@
 services:
-  omniparser:
+  omniparser-nvidia: &omniparser
+    profiles: [ "omniparser-gpu" ]
+
     build:
       context: ./
       dockerfile: Dockerfile
@@ -12,3 +14,15 @@ services:
       - ~/.EasyOCR/:/root/.EasyOCR
     environment:
       - HUGGING_FACE_HUB_TOKEN=${HUGGING_FACE_HUB_TOKEN}
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [ gpu ]
+
+  omniparser-cpu:
+    <<: *omniparser
+    profiles: [ "omniparser-cpu" ]
+    deploy: { }
