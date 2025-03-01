@@ -25,8 +25,8 @@ If you look at the Dockerfile, we start off with the HF demo image to retrive al
 ### Locally
 1. create cache directories
     ```shell
-    mkdir -p ~/.cache/huggingface \
-    mkdir -p ~/.EasyOCR \
+    mkdir -p ~/.cache/huggingface
+    mkdir -p ~/.EasyOCR
     mkdir -p ~/.paddleocr
     ```
 1. Clone the repository
