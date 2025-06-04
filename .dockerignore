@@ -1,0 +1,14 @@
+# flyctl launch added from .gitignore
+**/.idea
+
+
+# flyctl launch added from vendor/omniparser/.gitignore
+vendor/omniparser/**/weights/icon_caption_blip2
+vendor/omniparser/**/weights/icon_caption_florence
+vendor/omniparser/**/weights/icon_detect
+vendor/omniparser/**/weights/icon_detect_v1_5
+vendor/omniparser/**/weights/icon_detect_v1_5_2
+vendor/omniparser/**/.gradio
+vendor/omniparser/**/__pycache__
+vendor/omniparser/**/debug.ipynb
+fly.toml

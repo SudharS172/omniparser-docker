@@ -1,6 +1,9 @@
+# fly.toml app configuration file generated for omni-parser-app-ancient-lake-4073 on 2025-06-04T22:28:14+05:30
+#
 # See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
 
-app = 'omni-parser-app'
+app = 'omni-parser-app-ancient-lake-4073'
 primary_region = 'ord'
 swap_size_mb = 32768 # 32gb
 
