@@ -2,21 +2,23 @@ FROM nvidia/cuda:12.2.2-cudnn8-devel-ubuntu22.04
 
 USER root
 
-# Install build dependencies for flash-attn
+# Install system dependencies and upgrade pip
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
   --mount=type=cache,target=/var/lib/apt,sharing=locked \
   apt update -q && apt install -y --no-install-recommends \
-  git curl python3 python3-pip python3-dev sudo \
-  libgl1-mesa-glx libglib2.0-0 \
-  build-essential gcc g++ make cmake ninja-build
+  git curl python3 python3-pip python3-dev python3-venv sudo \
+  libgl1-mesa-glx libglib2.0-0 libsm6 libxext6 libxrender-dev libgomp1 \
+  build-essential gcc g++ make cmake ninja-build \
+  wget unzip ca-certificates \
+  && python3 -m pip install --upgrade pip setuptools wheel
 
 WORKDIR /app
 
 COPY ./vendor ./vendor
 
-# Install PyTorch with auto CUDA detection (more reliable)
+# Install PyTorch with auto CUDA detection
 RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install torch torchvision torchaudio
+    python3 -m pip install --no-cache-dir torch torchvision torchaudio
 
 # Install core ML packages
 RUN --mount=type=cache,target=/root/.cache/pip \
