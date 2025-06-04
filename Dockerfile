@@ -14,9 +14,13 @@ WORKDIR /app
 
 COPY ./vendor ./vendor
 
-# Install core requirements first to establish base versions
+# Install PyTorch with CUDA 12.1 support (compatible with CUDA 12.2)
 RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install torch torchvision transformers timm einops==0.8.0 numpy
+    pip install torch==2.1.0 torchvision==0.16.0 --index-url https://download.pytorch.org/whl/cu121
+
+# Install core ML packages
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install transformers timm einops==0.8.0 numpy
 
 # Install OCR and additional packages
 RUN --mount=type=cache,target=/root/.cache/pip \
