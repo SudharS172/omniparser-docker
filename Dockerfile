@@ -1,11 +1,13 @@
-# Use runtime image (smaller) but with build tools temporarily
-FROM pytorch/pytorch:2.1.0-cuda12.1-cudnn8-runtime
+# Use devel image (has nvcc for flash-attention compilation)
+FROM pytorch/pytorch:2.1.0-cuda12.1-cudnn8-devel
 
 USER root
 
 # Set timezone non-interactively to avoid hanging
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=UTC
+ENV CUDA_HOME=/usr/local/cuda
+ENV PATH=$CUDA_HOME/bin:$PATH
 
 # Install build dependencies, packages, and clean up in minimal layers
 RUN apt update -q && apt install -y --no-install-recommends \
