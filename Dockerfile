@@ -3,6 +3,10 @@ FROM pytorch/pytorch:2.1.0-cuda12.1-cudnn8-runtime
 
 USER root
 
+# Set timezone non-interactively to avoid hanging
+ENV DEBIAN_FRONTEND=noninteractive
+ENV TZ=UTC
+
 # Install build dependencies, packages, and clean up in minimal layers
 RUN apt update -q && apt install -y --no-install-recommends \
   git curl wget build-essential gcc g++ cmake \
