@@ -1,24 +1,20 @@
-FROM nvidia/cuda:12.2.2-cudnn8-devel-ubuntu22.04
+FROM pytorch/pytorch:2.1.0-cuda12.1-cudnn8-devel
 
 USER root
 
-# Install system dependencies and upgrade pip
-RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
-  --mount=type=cache,target=/var/lib/apt,sharing=locked \
-  apt update -q && apt install -y --no-install-recommends \
-  git curl python3 python3-pip python3-dev python3-venv sudo \
+# Install system dependencies
+RUN apt update -q && apt install -y --no-install-recommends \
+  git curl sudo wget unzip \
   libgl1-mesa-glx libglib2.0-0 libsm6 libxext6 libxrender-dev libgomp1 \
   build-essential gcc g++ make cmake ninja-build \
-  wget unzip ca-certificates \
-  && python3 -m pip install --upgrade pip setuptools wheel
+  && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
 COPY ./vendor ./vendor
 
-# Install PyTorch with auto CUDA detection
-RUN --mount=type=cache,target=/root/.cache/pip \
-    python3 -m pip install --no-cache-dir torch torchvision torchaudio
+# PyTorch is already installed in base image - just upgrade if needed
+RUN pip install --upgrade pip setuptools wheel
 
 # Install core ML packages
 RUN --mount=type=cache,target=/root/.cache/pip \
