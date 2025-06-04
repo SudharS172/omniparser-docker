@@ -14,11 +14,19 @@ WORKDIR /app
 
 COPY ./vendor ./vendor
 
-# Install vendor requirements first
+# Install core requirements first to establish base versions
 RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install -r vendor/omniparser/requirements.txt
+    pip install torch torchvision transformers timm einops==0.8.0 numpy
 
-# Install additional packages
+# Install OCR and additional packages
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install easyocr paddlepaddle paddleocr opencv-python opencv-python-headless
+
+# Install other vendor requirements
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install supervision==0.18.0 openai==1.3.5 azure-identity gradio dill accelerate
+
+# Install our additional packages
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install fastapi[all] loguru ultralytics==8.3.81
 
@@ -38,7 +46,7 @@ RUN mkdir -p /root/.cache/huggingface \
     && mkdir -p /root/.EasyOCR \
     && mkdir -p /app/imgs
 
-ENV PYTHONPATH=${PYTHONPATH}:/app/vendor/omniparser
+ENV PYTHONPATH=/app/vendor/omniparser
 COPY app.py app.py
 
 CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "7860"]
