@@ -1,0 +1,28 @@
+# Fixed requirements for OmniParser API
+fastapi[all]==0.104.1
+uvicorn==0.24.0
+loguru==0.7.2
+ultralytics==8.3.81
+
+# Core ML libraries with specific versions
+torch==2.1.0
+torchvision==0.16.0
+transformers==4.35.2  # Fixed version for Florence2 compatibility
+timm==0.9.12
+einops==0.8.0
+
+# OCR libraries
+easyocr==1.7.0
+paddlepaddle==2.5.2
+paddleocr==2.7.0.3
+
+# Image processing
+opencv-python==4.8.1.78
+opencv-python-headless==4.8.1.78
+Pillow==10.1.0
+
+# Other dependencies
+numpy==1.24.3
+supervision==0.18.0
+accelerate==0.24.1
+dill==0.3.7 

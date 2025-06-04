@@ -10,11 +10,14 @@ WORKDIR /app
 
 COPY ./vendor ./vendor
 
+# Install fixed requirements first
+COPY requirements-fix.txt requirements-fix.txt
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install -r requirements-fix.txt
+
+# Then install vendor requirements (may override some versions)
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install -r vendor/omniparser/requirements.txt
-
-RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install fastapi[all] loguru ultralytics==8.3.81
 
 RUN mkdir -p /root/.cache/huggingface \
     && mkdir -p /root/.config/matplotlib \
