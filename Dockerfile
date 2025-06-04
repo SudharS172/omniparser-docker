@@ -22,6 +22,10 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install --upgrade "transformers>=4.35.0,<4.40.0"
 
+# Install flash_attn for Florence2 model
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install flash-attn --no-build-isolation
+
 RUN mkdir -p /root/.cache/huggingface \
     && mkdir -p /root/.config/matplotlib \
     && mkdir -p /root/.paddleocr \
