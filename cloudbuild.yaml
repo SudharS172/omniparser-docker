@@ -30,6 +30,7 @@ availableSecrets:
 options:
   machineType: 'E2_HIGHCPU_8'
   diskSizeGb: 100
+  logging: CLOUD_LOGGING_ONLY
 
 # Timeout for large ML builds
 timeout: 3600s 
