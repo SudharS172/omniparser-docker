@@ -1,10 +1,14 @@
-FROM nvidia/cuda:12.2.2-cudnn8-runtime-ubuntu22.04
+FROM nvidia/cuda:12.2.2-cudnn8-devel-ubuntu22.04
 
 USER root
 
+# Install build dependencies for flash-attn
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
   --mount=type=cache,target=/var/lib/apt,sharing=locked \
-  apt update -q && apt install -y --no-install-recommends git curl python3 python3-pip sudo libgl1-mesa-glx libglib2.0-0
+  apt update -q && apt install -y --no-install-recommends \
+  git curl python3 python3-pip python3-dev sudo \
+  libgl1-mesa-glx libglib2.0-0 \
+  build-essential gcc g++ make cmake ninja-build
 
 WORKDIR /app
 
@@ -22,7 +26,9 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install --upgrade "transformers>=4.35.0,<4.40.0"
 
-# Install flash_attn for Florence2 model
+# Install flash_attn for Florence2 model with proper build environment
+ENV MAX_JOBS=1
+ENV FLASH_ATTENTION_FORCE_BUILD=TRUE
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install flash-attn --no-build-isolation
 
