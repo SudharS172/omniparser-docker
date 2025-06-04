@@ -4,6 +4,10 @@ Self-hosted version of Microsoft's [OmniParser-V2](https://huggingface.co/micros
 
 > OmniParser is a general screen parsing tool, which interprets/converts UI screenshot to structured format, to improve existing LLM based UI agent. Training Datasets include: 1) an interactable icon detection dataset, which was curated from popular web pages and automatically annotated to highlight clickable and actionable regions, and 2) an icon description dataset, designed to associate each UI element with its corresponding function.
 
+## Docker Hub
+- Image: `sudhar1/omniparser-api:latest`
+- Deployment: RunPod GPU Cloud
+
 ## Why?
 
 There's already a great HuggingFace gradio [app](https://huggingface.co/spaces/microsoft/OmniParser-v2.0) for this model. It even offers an API. But
@@ -31,17 +35,16 @@ If you look at the Dockerfile, we start off with the HF demo image to retrive al
     ```
 2. Clone the repository:
    ```shell
-   git clone https://github.com/lokkju/omniparser-api-v2.git
+   git clone https://github.com/SudharS172/omniparser-docker.git
+   cd omniparser-docker
    git submodule update --init --recursive
    ```
 2. Build the docker image: `docker compose --profile omniparser-cpu build`
 3. Run the docker container: `docker compose --profile omniparser-cpu up -d`
 
-### Self-hosted API
+### RunPod Deployment
 
-I suggest hosting on [fly.io](https://fly.io) because it's quick and simple to deploy with a CLI.
-
-This repo is ready-made for deployment on fly.io (see fly.toml for configuration). Just run `fly launch` and follow the prompts.
+Deploy on RunPod GPU Cloud using the Docker image: `sudhar1/omniparser-api:latest`
 
 ## Docs
 
