@@ -14,9 +14,9 @@ WORKDIR /app
 
 COPY ./vendor ./vendor
 
-# Install PyTorch with CUDA 12.1 support (compatible with CUDA 12.2)
+# Install PyTorch with auto CUDA detection (more reliable)
 RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install torch==2.1.0 torchvision==0.16.0 --index-url https://download.pytorch.org/whl/cu121
+    pip install torch torchvision torchaudio
 
 # Install core ML packages
 RUN --mount=type=cache,target=/root/.cache/pip \
