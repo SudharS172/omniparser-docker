@@ -1,9 +1,8 @@
 steps:
-  # Login to Docker Hub
+  # Login to Docker Hub with inline credentials (temporary workaround)
   - name: 'gcr.io/cloud-builders/docker'
     entrypoint: 'bash'
-    args: ['-c', 'echo "$$DOCKER_PASSWORD" | docker login --username=$$DOCKER_USERNAME --password-stdin']
-    secretEnv: ['DOCKER_USERNAME', 'DOCKER_PASSWORD']
+    args: ['-c', 'echo "dckr_pat_rCJwMMv_qC3DQbmnZ8CjDBPG4BE" | docker login --username=sudhar1 --password-stdin']
 
   # Build the Docker image
   - name: 'gcr.io/cloud-builders/docker'
@@ -17,14 +16,6 @@ steps:
   # Push to Docker Hub
   - name: 'gcr.io/cloud-builders/docker'
     args: ['push', 'sudhar1/omniparser-api:latest']
-
-# Configure secrets for Docker Hub authentication
-availableSecrets:
-  secretManager:
-    - versionName: projects/omniparserv2/secrets/docker-hub-username/versions/2
-      env: 'DOCKER_USERNAME'
-    - versionName: projects/omniparserv2/secrets/docker-hub-password/versions/1
-      env: 'DOCKER_PASSWORD'
 
 # Use high-CPU machine for faster builds
 options:
