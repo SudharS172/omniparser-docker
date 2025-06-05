@@ -1,8 +1,4 @@
 import os
-import sys
-
-# Add vendor/omniparser to Python path
-sys.path.append(os.path.join(os.path.dirname(__file__), 'vendor', 'omniparser'))
 
 from fastapi import FastAPI, File, UploadFile, HTTPException, Query
 from pydantic import BaseModel

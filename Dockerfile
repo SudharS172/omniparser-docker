@@ -25,16 +25,17 @@ RUN apt update -q && apt install -y --no-install-recommends \
   && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* /root/.cache/pip
 
 WORKDIR /app
-COPY ./vendor ./vendor
-COPY app.py app.py
 
-# Create __init__.py files to make vendor a proper Python package
-RUN touch /app/vendor/__init__.py && touch /app/vendor/omniparser/__init__.py
+# Copy vendor directory for reference and weights
+COPY ./vendor ./vendor
+
+# Copy the utils.py file directly to app directory for easier importing
+RUN cp /app/vendor/omniparser/utils.py /app/utils.py
+
+# Copy app.py
+COPY app.py app.py
 
 RUN mkdir -p /root/.cache/huggingface /root/.config/matplotlib \
     /root/.paddleocr /root/.EasyOCR /app/imgs
-
-# Set PYTHONPATH to include the app directory
-ENV PYTHONPATH=/app
 
 CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "7860"]
