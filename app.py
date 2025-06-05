@@ -60,6 +60,81 @@ class ProcessResponse(BaseModel):
     parsed_content_list: str
     label_coordinates: str
 
+class DetectResponse(BaseModel):
+    image: str  # Base64 encoded image with bounding boxes
+    coordinates: str  # JSON string of coordinates
+
+@torch.inference_mode()
+def detect_fast(
+    image_input,
+    box_threshold,
+    iou_threshold,
+    imgsz,
+) -> Optional[DetectResponse]:
+    """Fast detection - only YOLO detection, no OCR or AI captioning"""
+    image_save_path = 'imgs/saved_image_fast.png'
+    image_input.save(image_save_path)
+    image = Image.open(image_save_path)
+    
+    # Get YOLO predictions directly
+    from utils import predict_yolo, remove_overlap, load_image, annotate
+    import numpy as np
+    
+    # Load image for processing
+    image_source, _ = load_image(image_save_path)
+    
+    # Run YOLO detection
+    boxes, logits = predict_yolo(yolo_model, image_save_path, box_threshold, imgsz=imgsz, scale_img=False, iou_threshold=iou_threshold)
+    
+    # Remove overlapping boxes
+    filtered_boxes = remove_overlap(boxes, iou_threshold, ocr_bbox=None)
+    
+    # Create simple labels (just box IDs)
+    phrases = [f"element_{i}" for i in range(len(filtered_boxes))]
+    
+    # Draw bounding boxes
+    box_overlay_ratio = image.size[0] / 3200
+    draw_bbox_config = {
+        'text_scale': 0.8 * box_overlay_ratio,
+        'text_thickness': max(int(2 * box_overlay_ratio), 1),
+        'text_padding': max(int(3 * box_overlay_ratio), 1),
+        'thickness': max(int(3 * box_overlay_ratio), 1),
+    }
+    
+    annotated_frame, label_coordinates = annotate(
+        image_source=image_source, 
+        boxes=filtered_boxes, 
+        logits=logits, 
+        phrases=phrases, 
+        **draw_bbox_config
+    )
+    
+    # Convert to PIL and encode to base64
+    from PIL import Image as PILImage
+    from torchvision.transforms import ToPILImage
+    
+    to_pil = ToPILImage()
+    pil_image = to_pil(annotated_frame)
+    
+    # Encode image to base64
+    buffered = io.BytesIO()
+    pil_image.save(buffered, format="PNG")
+    img_str = base64.b64encode(buffered.getvalue()).decode("utf-8")
+    
+    # Create coordinates list
+    coordinates_list = []
+    for i, box in enumerate(filtered_boxes):
+        coordinates_list.append({
+            "id": i,
+            "bbox": [float(box[0]), float(box[1]), float(box[2]), float(box[3])],
+            "confidence": float(logits[i]) if i < len(logits) else 0.0
+        })
+    
+    return DetectResponse(
+        image=img_str,
+        coordinates=json.dumps(coordinates_list)
+    )
+
 @torch.inference_mode()
 # @torch.autocast(device_type="cuda", dtype=torch.bfloat16)
 def process(
@@ -102,7 +177,32 @@ def process(
     )
 
 
+@app.post("/detect_elements", response_model=DetectResponse)
+async def detect_elements(
+    image_file: UploadFile = File(...),
+    box_threshold: Annotated[float, Query(ge=0.01, le=1.0)] = 0.05,
+    iou_threshold: Annotated[float, Query(ge=0.01, le=1.0)] = 0.1,
+    imgsz: Annotated[int, Query(ge=640, le=3200)] = 1920,
+):
+    """
+    🚀 FAST: Detect UI elements with bounding boxes only (no OCR, no AI captioning)
+    
+    Returns coordinates and annotated image in ~1-2 seconds for rapid GUI automation.
+    
+    Args:
+        image_file (UploadFile): The image file to process
+        box_threshold (float): Confidence threshold for detections, default=0.05
+        iou_threshold (float): Overlap threshold for removing duplicates, default=0.1  
+        imgsz (int): Detection image size, default=1920
+    """
+    try:
+        contents = await image_file.read()
+        image_input = Image.open(io.BytesIO(contents)).convert("RGB")
+    except Exception as e:
+        raise HTTPException(status_code=400, detail="Invalid image file")
 
+    response = detect_fast(image_input, box_threshold, iou_threshold, imgsz)
+    return response
 
 @app.post("/process_image", response_model=ProcessResponse)
 async def process_image(
@@ -114,7 +214,7 @@ async def process_image(
     icon_process_batch_size: Annotated[int, Query(ge=1, le=256)] = 64,
 ):
     """
-    Process an image file and return the processed image with bounding boxes and parsed content list
+    🔍 FULL: Process an image with complete OCR and AI captioning (slower but detailed)
 
     Args:
         image_file (UploadFile): The image file to process
