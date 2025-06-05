@@ -29,10 +29,8 @@ WORKDIR /app
 # Copy vendor directory for reference and weights
 COPY ./vendor ./vendor
 
-# Copy the utils.py file directly to app directory for easier importing
-RUN cp /app/vendor/omniparser/utils.py /app/utils.py
-
-# Copy app.py
+# Copy utils.py and app.py directly
+COPY utils.py utils.py
 COPY app.py app.py
 
 RUN mkdir -p /root/.cache/huggingface /root/.config/matplotlib \
