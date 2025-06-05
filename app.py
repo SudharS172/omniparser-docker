@@ -74,47 +74,61 @@ def detect_fast(
     """Fast detection - only YOLO detection, no OCR or AI captioning"""
     image_save_path = 'imgs/saved_image_fast.png'
     image_input.save(image_save_path)
-    image = Image.open(image_save_path)
     
-    # Get YOLO predictions directly
-    from utils import predict_yolo, remove_overlap, load_image, annotate
+    # Simple YOLO detection without complex image loading
+    from ultralytics import YOLO
+    
+    # Run YOLO directly on the image path
+    results = yolo_model(image_save_path, imgsz=imgsz, conf=box_threshold, iou=iou_threshold)
+    
+    # Extract boxes and confidence scores
+    boxes = []
+    confidences = []
+    
+    if len(results) > 0 and results[0].boxes is not None:
+        # Get boxes in xyxy format
+        boxes_tensor = results[0].boxes.xyxy.cpu()
+        conf_tensor = results[0].boxes.conf.cpu()
+        
+        boxes = boxes_tensor.tolist()
+        confidences = conf_tensor.tolist()
+    
+    # Draw bounding boxes on the original image
+    import cv2
     import numpy as np
     
-    # Load image for processing
-    image_source, _ = load_image(image_save_path)
+    # Load image with OpenCV for annotation
+    image_cv = cv2.imread(image_save_path)
+    image_cv = cv2.cvtColor(image_cv, cv2.COLOR_BGR2RGB)
     
-    # Run YOLO detection
-    boxes, logits = predict_yolo(yolo_model, image_save_path, box_threshold, imgsz=imgsz, scale_img=False, iou_threshold=iou_threshold)
+    # Calculate box overlay ratio for text scaling
+    box_overlay_ratio = image_input.size[0] / 3200
     
-    # Remove overlapping boxes
-    filtered_boxes = remove_overlap(boxes, iou_threshold, ocr_bbox=None)
+    # Draw boxes
+    for i, (box, conf) in enumerate(zip(boxes, confidences)):
+        x1, y1, x2, y2 = map(int, box)
+        
+        # Draw rectangle
+        color = (0, 255, 0)  # Green
+        thickness = max(int(3 * box_overlay_ratio), 1)
+        cv2.rectangle(image_cv, (x1, y1), (x2, y2), color, thickness)
+        
+        # Draw label
+        label = f"element_{i}"
+        font_scale = 0.8 * box_overlay_ratio
+        font_thickness = max(int(2 * box_overlay_ratio), 1)
+        
+        # Get text size
+        (text_width, text_height), baseline = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, font_scale, font_thickness)
+        
+        # Draw text background
+        cv2.rectangle(image_cv, (x1, y1 - text_height - 10), (x1 + text_width, y1), color, -1)
+        
+        # Draw text
+        cv2.putText(image_cv, label, (x1, y1 - 5), cv2.FONT_HERSHEY_SIMPLEX, font_scale, (0, 0, 0), font_thickness)
     
-    # Create simple labels (just box IDs)
-    phrases = [f"element_{i}" for i in range(len(filtered_boxes))]
-    
-    # Draw bounding boxes
-    box_overlay_ratio = image.size[0] / 3200
-    draw_bbox_config = {
-        'text_scale': 0.8 * box_overlay_ratio,
-        'text_thickness': max(int(2 * box_overlay_ratio), 1),
-        'text_padding': max(int(3 * box_overlay_ratio), 1),
-        'thickness': max(int(3 * box_overlay_ratio), 1),
-    }
-    
-    annotated_frame, label_coordinates = annotate(
-        image_source=image_source, 
-        boxes=filtered_boxes, 
-        logits=logits, 
-        phrases=phrases, 
-        **draw_bbox_config
-    )
-    
-    # Convert to PIL and encode to base64
-    from PIL import Image as PILImage
-    from torchvision.transforms import ToPILImage
-    
-    to_pil = ToPILImage()
-    pil_image = to_pil(annotated_frame)
+    # Convert back to PIL Image
+    pil_image = Image.fromarray(image_cv)
     
     # Encode image to base64
     buffered = io.BytesIO()
@@ -123,11 +137,11 @@ def detect_fast(
     
     # Create coordinates list
     coordinates_list = []
-    for i, box in enumerate(filtered_boxes):
+    for i, (box, conf) in enumerate(zip(boxes, confidences)):
         coordinates_list.append({
             "id": i,
             "bbox": [float(box[0]), float(box[1]), float(box[2]), float(box[3])],
-            "confidence": float(logits[i]) if i < len(logits) else 0.0
+            "confidence": float(conf)
         })
     
     return DetectResponse(
