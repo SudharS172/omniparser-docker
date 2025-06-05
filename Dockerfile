@@ -29,8 +29,9 @@ WORKDIR /app
 # Copy vendor directory for reference and weights
 COPY ./vendor ./vendor
 
-# Copy utils.py and app.py directly
+# Copy utils.py, util directory, and app.py directly
 COPY utils.py utils.py
+COPY util util
 COPY app.py app.py
 
 RUN mkdir -p /root/.cache/huggingface /root/.config/matplotlib \
