@@ -777,7 +777,7 @@ def detect_fast_ultra(
     
     pil_image = Image.fromarray(image_cv)
     buffered = io.BytesIO()
-    pil_image.save(buffered, format="PNG", optimize=True, compress_level=1)  # Fast compression
+    pil_image.save(buffered, format="JPEG", quality=70, optimize=False)  # Even lower quality for speed
     img_str = base64.b64encode(buffered.getvalue()).decode("utf-8")
     
     encoding_time = time.time() - encoding_start
@@ -825,20 +825,20 @@ def detect_fast_super(
     
     # SPEED HACK 2: Aggressive but smart sizing
     if original_width > 1280 or original_height > 720:
-        # Force smaller size for large images
-        scale = min(1280 / original_width, 720 / original_height)
+        # Force smaller size for large images - MORE AGGRESSIVE
+        scale = min(896 / original_width, 640 / original_height)  # Reduced from 1280x720
         new_width = int(original_width * scale)
         new_height = int(original_height * scale)
         
         # Fast resize
         image_resized = image_input.resize((new_width, new_height), Image.Resampling.BILINEAR)
         image_save_path = 'imgs/super_fast.jpg'  # Use JPEG for speed
-        image_resized.save(image_save_path, quality=85, optimize=False)
+        image_resized.save(image_save_path, quality=75, optimize=False)  # Lower quality for speed
         scale_factor = scale
     else:
         # Direct save for smaller images
         image_save_path = 'imgs/super_fast_orig.jpg'
-        image_input.save(image_save_path, quality=85, optimize=False)
+        image_input.save(image_save_path, quality=75, optimize=False)  # Lower quality
         scale_factor = 1.0
     
     # ACCURACY HACK: Single-pass with optimized parameters
@@ -848,14 +848,14 @@ def detect_fast_super(
     # CRITICAL: Use optimized parameters for both speed AND accuracy
     results = yolo_model(
         image_save_path,
-        imgsz=min(1024, imgsz),  # Balanced size for speed
+        imgsz=896,  # Reduced from 1024 for speed
         conf=0.005,  # VERY low threshold to catch everything
         iou=0.05,   # Very low IOU to keep more detections
         verbose=False,
         device='cuda' if torch.cuda.is_available() else 'cpu',
         half=True,  # FP16 for speed
         agnostic_nms=False,  # Use class-aware NMS for better results
-        max_det=500,  # Allow many detections
+        max_det=300,  # Reduced from 500 for speed
     )
     
     inference_time = time.time() - inference_start
@@ -899,9 +899,9 @@ def detect_fast_super(
     # SPEED HACK 3: Minimal post-processing
     processing_start = time.time()
     
-    # Simple overlap removal (faster than advanced NMS)
+    # Improved overlap removal (better quality, still fast)
     if len(all_boxes) > 1:
-        # Quick and dirty overlap removal
+        # Better overlap removal to prevent overlapping boxes
         final_boxes = []
         final_confidences = []
         
@@ -912,25 +912,32 @@ def detect_fast_super(
             box_i = all_boxes[i]
             conf_i = all_confidences[i]
             
-            # Check if this box overlaps significantly with any already kept box
+            # Calculate center point and dimensions of current box
+            center_x_i = (box_i[0] + box_i[2]) / 2
+            center_y_i = (box_i[1] + box_i[3]) / 2
+            width_i = box_i[2] - box_i[0]
+            height_i = box_i[3] - box_i[1]
+            
+            # Check if this box is too close to any already kept box
             keep = True
             for kept_box in final_boxes:
-                # Calculate overlap
-                x1_max = max(box_i[0], kept_box[0])
-                y1_max = max(box_i[1], kept_box[1])
-                x2_min = min(box_i[2], kept_box[2])
-                y2_min = min(box_i[3], kept_box[3])
+                # Calculate center point and dimensions of kept box
+                center_x_kept = (kept_box[0] + kept_box[2]) / 2
+                center_y_kept = (kept_box[1] + kept_box[3]) / 2
+                width_kept = kept_box[2] - kept_box[0]
+                height_kept = kept_box[3] - kept_box[1]
                 
-                if x1_max < x2_min and y1_max < y2_min:
-                    # There is overlap
-                    overlap_area = (x2_min - x1_max) * (y2_min - y1_max)
-                    box_i_area = (box_i[2] - box_i[0]) * (box_i[3] - box_i[1])
-                    kept_box_area = (kept_box[2] - kept_box[0]) * (kept_box[3] - kept_box[1])
-                    
-                    # If overlap is significant, skip this box
-                    if overlap_area > 0.3 * min(box_i_area, kept_box_area):
-                        keep = False
-                        break
+                # Stricter distance check to prevent overlaps
+                distance_x = abs(center_x_i - center_x_kept)
+                distance_y = abs(center_y_i - center_y_kept)
+                
+                # More strict thresholds to prevent overlapping
+                threshold_x = min(width_i, width_kept) * 0.4  # Increased from 0.3
+                threshold_y = min(height_i, height_kept) * 0.4  # Increased from 0.3
+                
+                if distance_x < threshold_x and distance_y < threshold_y:
+                    keep = False
+                    break
             
             if keep:
                 final_boxes.append(box_i)
@@ -943,9 +950,9 @@ def detect_fast_super(
         filtered_confidences = all_confidences
     
     processing_time = time.time() - processing_start
-    print(f"🎯 Fast filtering: {processing_time:.3f}s, final elements: {len(filtered_boxes)}")
+    print(f"🎯 Improved filtering: {processing_time:.3f}s, final elements: {len(filtered_boxes)}")
     
-    # SPEED HACK 4: Ultra-fast annotation
+    # SPEED HACK 4: High-quality but fast annotation
     annotation_start = time.time()
     
     # Convert to cv2 format
@@ -954,53 +961,82 @@ def detect_fast_super(
     image_cv = cv2.cvtColor(image_cv, cv2.COLOR_BGR2RGB)
     
     if filtered_boxes:
-        # Fast color cycling
-        base_colors = [
-            (255, 0, 0), (0, 255, 0), (0, 0, 255), (255, 255, 0), (255, 0, 255),
-            (0, 255, 255), (255, 128, 0), (128, 255, 0), (0, 128, 255), (255, 0, 128)
+        # Professional color palette (better visibility)
+        colors = [
+            (255, 0, 0),    # Red
+            (0, 255, 0),    # Green  
+            (0, 0, 255),    # Blue
+            (255, 165, 0),  # Orange
+            (255, 0, 255),  # Magenta
+            (0, 255, 255),  # Cyan
+            (255, 255, 0),  # Yellow
+            (128, 0, 128),  # Purple
+            (255, 192, 203), # Pink
+            (0, 128, 0),    # Dark Green
+            (128, 128, 0),  # Olive
+            (0, 0, 128),    # Navy
+            (128, 0, 0),    # Maroon
+            (0, 128, 128),  # Teal
+            (192, 192, 192) # Silver
         ]
         
         box_overlay_ratio = min(1.0, original_width / 1920)  # Cap scaling
         
-        # Optimized annotation parameters
+        # IMPROVED: Thinner, cleaner annotation parameters
         font = cv2.FONT_HERSHEY_SIMPLEX
-        text_scale = max(0.4 * box_overlay_ratio, 0.3)
+        text_scale = max(0.5 * box_overlay_ratio, 0.4)  # Slightly larger text
         text_thickness = max(int(1.5 * box_overlay_ratio), 1)
-        box_thickness = max(int(2 * box_overlay_ratio), 1)
+        box_thickness = max(int(1.5 * box_overlay_ratio), 1)  # THINNER boxes
+        text_padding = max(int(4 * box_overlay_ratio), 3)
         
         for i, (box, conf) in enumerate(zip(filtered_boxes, filtered_confidences)):
             x1, y1, x2, y2 = map(int, box)
             
-            # Fast color selection
-            color = base_colors[i % len(base_colors)]
+            # Use color from palette
+            color = colors[i % len(colors)]
             
-            # Draw box
+            # Draw THINNER box
             cv2.rectangle(image_cv, (x1, y1), (x2, y2), color, box_thickness)
             
-            # Minimal label
+            # Better label positioning
             label = str(i)
-            
-            # Fast label positioning (no complex calculations)
-            label_x = x1 + 2
-            label_y = y1 - 5 if y1 > 20 else y1 + 20
-            
-            # Simple background
             (text_width, text_height), _ = cv2.getTextSize(label, font, text_scale, text_thickness)
-            cv2.rectangle(image_cv, (label_x - 1, label_y - text_height - 1), 
-                         (label_x + text_width + 1, label_y + 1), color, cv2.FILLED)
             
-            # High contrast text
-            cv2.putText(image_cv, label, (label_x, label_y), font, text_scale, (255, 255, 255), text_thickness)
+            # Smart positioning to avoid overlaps and edges
+            label_x = x1 + 2
+            label_y = y1 - text_padding
+            
+            # If label would go outside image bounds, reposition
+            if label_y - text_height < 0:
+                label_y = y1 + text_height + text_padding  # Move inside box
+            if label_x + text_width > original_width - 5:
+                label_x = max(0, x2 - text_width - 2)  # Move to right side of box
+            
+            # HIGH CONTRAST background for text
+            bg_x1 = label_x - 2
+            bg_y1 = label_y - text_height - 2
+            bg_x2 = label_x + text_width + 2
+            bg_y2 = label_y + 2
+            
+            # Dark background for light text or light background for dark text
+            bg_color = (0, 0, 0) if sum(color) > 400 else (255, 255, 255)
+            cv2.rectangle(image_cv, (bg_x1, bg_y1), (bg_x2, bg_y2), bg_color, cv2.FILLED)
+            
+            # HIGH CONTRAST text color
+            text_color = (255, 255, 255) if sum(color) > 400 else (0, 0, 0)
+            
+            # Draw crisp text with anti-aliasing
+            cv2.putText(image_cv, label, (label_x, label_y), font, text_scale, text_color, text_thickness, cv2.LINE_AA)
     
     annotation_time = time.time() - annotation_start
-    print(f"🎨 Fast annotation: {annotation_time:.3f}s")
+    print(f"🎨 High-quality annotation: {annotation_time:.3f}s")
     
     # SPEED HACK 5: Ultra-fast encoding
     encoding_start = time.time()
     
     pil_image = Image.fromarray(image_cv)
     buffered = io.BytesIO()
-    pil_image.save(buffered, format="JPEG", quality=85, optimize=False)  # Fast JPEG
+    pil_image.save(buffered, format="JPEG", quality=70, optimize=False)  # Even lower quality for speed
     img_str = base64.b64encode(buffered.getvalue()).decode("utf-8")
     
     encoding_time = time.time() - encoding_start
