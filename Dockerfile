@@ -19,7 +19,7 @@ RUN apt update -q && apt install -y --no-install-recommends \
      easyocr paddlepaddle paddleocr opencv-python opencv-python-headless \
      supervision==0.18.0 openai==1.3.5 azure-identity gradio dill accelerate \
      fastapi[all] loguru ultralytics==8.3.81 "transformers>=4.35.0,<4.40.0" \
-  && pip install --no-cache-dir flash-attn --no-build-isolation \
+  && pip install --no-cache-dir flash-attn==2.3.6 --no-build-isolation \
   && apt remove -y build-essential gcc g++ cmake \
   && apt autoremove -y && apt clean \
   && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* /root/.cache/pip
