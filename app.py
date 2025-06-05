@@ -71,49 +71,60 @@ def detect_fast(
     iou_threshold,
     imgsz,
 ) -> Optional[DetectResponse]:
-    """Ultra-fast detection - optimized for speed and accuracy"""
-    image_save_path = 'imgs/saved_image_fast.png'
+    """EXTREME SPEED: Target <1 second response time"""
     
-    # SPEED OPTIMIZATION 1: Skip file I/O for smaller images
+    # EXTREME OPTIMIZATION 1: Minimal image processing
     import cv2
     import numpy as np
+    import time
     
-    # Convert PIL to numpy directly (faster than saving/loading)
+    start_time = time.time()
+    
+    # Convert directly to numpy (skip file I/O completely)
     image_np = np.array(image_input)
-    if len(image_np.shape) == 3:
-        image_np = cv2.cvtColor(image_np, cv2.COLOR_RGB2BGR)
-    
-    # SPEED OPTIMIZATION 2: Adaptive image sizing for speed
     original_height, original_width = image_np.shape[:2]
     
-    # Use smaller size for faster inference, scale back results
-    if imgsz > 1280 and (original_width > 1920 or original_height > 1080):
-        # Use smaller size for very large images
-        inference_size = 1280
+    # EXTREME OPTIMIZATION 2: Aggressive size reduction for speed
+    # Force much smaller inference size for near-instant results
+    max_size = min(640, imgsz)  # Force very small size
+    
+    # Calculate scaling to maintain aspect ratio
+    scale = min(max_size / original_width, max_size / original_height)
+    if scale < 1.0:
+        new_width = int(original_width * scale)
+        new_height = int(original_height * scale)
+        # Resize for inference
+        image_resized = cv2.resize(image_np, (new_width, new_height), interpolation=cv2.INTER_LINEAR)
     else:
-        inference_size = imgsz
+        image_resized = image_np
+        scale = 1.0
     
-    # ACCURACY OPTIMIZATION: Lower thresholds to catch more elements
-    # Override user thresholds for better detection
-    optimized_box_threshold = min(box_threshold, 0.03)  # Lower = more detections
-    optimized_iou_threshold = max(iou_threshold, 0.15)  # Higher = less filtering
+    # EXTREME OPTIMIZATION 3: Super aggressive thresholds
+    ultra_low_threshold = 0.01  # Catch everything possible
+    ultra_high_iou = 0.3  # Allow more overlaps
     
-    # Save for YOLO (still needed for model)
-    image_input.save(image_save_path)
+    # Save resized image for YOLO
+    temp_path = 'imgs/temp_ultra_fast.jpg'  # Use JPG for speed
+    cv2.imwrite(temp_path, cv2.cvtColor(image_resized, cv2.COLOR_RGB2BGR), [cv2.IMWRITE_JPEG_QUALITY, 85])
     
-    # SPEED OPTIMIZATION 3: Optimized YOLO inference
+    # EXTREME OPTIMIZATION 4: Ultra-fast YOLO inference
     from ultralytics import YOLO
     
+    inference_start = time.time()
     results = yolo_model(
-        image_save_path, 
-        imgsz=inference_size,  # Smaller for speed
-        conf=optimized_box_threshold,  # Lower for more detections
-        iou=optimized_iou_threshold,   # Balanced filtering
-        verbose=False,  # Skip verbose output
-        device='cuda' if torch.cuda.is_available() else 'cpu'
+        temp_path,
+        imgsz=max_size,  # Force small size
+        conf=ultra_low_threshold,  # Ultra-low threshold
+        iou=ultra_high_iou,  # High IOU for more detections
+        verbose=False,
+        device='cuda' if torch.cuda.is_available() else 'cpu',
+        half=True,  # Use FP16 for speed
+        agnostic_nms=True,  # Faster NMS
     )
+    inference_time = time.time() - inference_start
+    print(f"🔥 YOLO inference: {inference_time:.3f}s")
     
-    # Extract boxes and confidence scores
+    # Extract and scale boxes back to original size
     boxes = []
     confidences = []
     
@@ -121,86 +132,81 @@ def detect_fast(
         boxes_tensor = results[0].boxes.xyxy.cpu()
         conf_tensor = results[0].boxes.conf.cpu()
         
-        boxes = boxes_tensor.tolist()
+        # Scale boxes back to original image size
+        boxes_scaled = []
+        for box in boxes_tensor:
+            x1, y1, x2, y2 = box.tolist()
+            # Scale back
+            x1_orig = x1 / scale
+            y1_orig = y1 / scale  
+            x2_orig = x2 / scale
+            y2_orig = y2 / scale
+            boxes_scaled.append([x1_orig, y1_orig, x2_orig, y2_orig])
+        
+        boxes = boxes_scaled
         confidences = conf_tensor.tolist()
     
-    # SPEED OPTIMIZATION 4: Fast annotation with minimal overhead
-    import supervision as sv
-    from supervision.draw.color import ColorPalette
+    # EXTREME OPTIMIZATION 5: Lightning-fast annotation
+    annotation_start = time.time()
     
-    # Use original image for annotation (avoid conversion overhead)
-    image_cv = cv2.cvtColor(image_np, cv2.COLOR_BGR2RGB)
+    # Use original image for annotation
+    if len(image_np.shape) == 3:
+        image_cv = cv2.cvtColor(image_np, cv2.COLOR_RGB2BGR)
+        image_cv = cv2.cvtColor(image_cv, cv2.COLOR_BGR2RGB)
+    else:
+        image_cv = image_np
     
-    # SPEED OPTIMIZATION 5: Simplified scaling
-    box_overlay_ratio = min(original_width / 3200, 1.0)
-    
+    # Super minimal annotation
     if boxes:
-        # Create simple detections
-        xyxy = np.array(boxes)
-        detections = sv.Detections(xyxy=xyxy)
+        # Predefined colors for speed (avoid color palette computation)
+        colors = [
+            (255, 0, 0), (0, 255, 0), (0, 0, 255), (255, 255, 0), (255, 0, 255),
+            (0, 255, 255), (128, 0, 0), (0, 128, 0), (0, 0, 128), (128, 128, 0)
+        ]
         
-        # SPEED OPTIMIZATION 6: Streamlined annotation
-        # Skip complex overlap detection for speed
         font = cv2.FONT_HERSHEY_SIMPLEX
-        colors = ColorPalette.DEFAULT
+        font_scale = 0.4
+        font_thickness = 1
         
-        # Fast annotation loop
         for i, (box, conf) in enumerate(zip(boxes, confidences)):
             x1, y1, x2, y2 = map(int, box)
             
-            # Get color
-            color_rgb = colors.by_idx(i).as_rgb()
-            color_bgr = (color_rgb[2], color_rgb[1], color_rgb[0])  # Convert to BGR
+            # Cycle through colors
+            color = colors[i % len(colors)]
             
-            # Draw rectangle
-            thickness = max(int(2 * box_overlay_ratio), 1)
-            cv2.rectangle(image_cv, (x1, y1), (x2, y2), color_bgr, thickness)
+            # Draw minimal rectangle
+            cv2.rectangle(image_cv, (x1, y1), (x2, y2), color, 1)
             
-            # Simple label
+            # Minimal label (just number)
             label = str(i)
-            font_scale = max(0.5 * box_overlay_ratio, 0.3)
-            font_thickness = max(int(1 * box_overlay_ratio), 1)
             
-            # Get text size
-            (text_width, text_height), baseline = cv2.getTextSize(
-                label, font, font_scale, font_thickness
-            )
-            
-            # Smart label positioning (fast method)
-            label_y = y1 - 5 if y1 - text_height - 10 > 0 else y1 + text_height + 5
+            # Fast text positioning (no overlap checking)
+            label_y = max(y1 - 5, 15)
             label_x = x1
             
-            # Ensure label stays in image
-            if label_x + text_width > original_width:
-                label_x = original_width - text_width - 5
-            if label_x < 0:
-                label_x = 5
-                
-            # Draw label background
-            cv2.rectangle(
-                image_cv, 
-                (label_x - 2, label_y - text_height - 2), 
-                (label_x + text_width + 2, label_y + 2), 
-                color_bgr, 
-                cv2.FILLED
-            )
+            # Minimal background
+            text_size = cv2.getTextSize(label, font, font_scale, font_thickness)[0]
+            cv2.rectangle(image_cv, (label_x, label_y - text_size[1] - 2), 
+                         (label_x + text_size[0] + 2, label_y + 2), color, -1)
             
-            # Draw text (auto white/black based on luminance)
-            luminance = 0.299 * color_rgb[0] + 0.587 * color_rgb[1] + 0.114 * color_rgb[2]
-            text_color = (0, 0, 0) if luminance > 160 else (255, 255, 255)
-            
-            cv2.putText(
-                image_cv, label, (label_x, label_y), 
-                font, font_scale, text_color, font_thickness
-            )
+            # White text for contrast
+            cv2.putText(image_cv, label, (label_x + 1, label_y - 1), 
+                       font, font_scale, (255, 255, 255), font_thickness)
     
-    # SPEED OPTIMIZATION 7: Fast image encoding
+    annotation_time = time.time() - annotation_start
+    print(f"🎨 Annotation: {annotation_time:.3f}s")
+    
+    # EXTREME OPTIMIZATION 6: Ultra-fast encoding
+    encoding_start = time.time()
+    
+    # Use JPEG for much faster encoding (vs PNG)
     pil_image = Image.fromarray(image_cv)
-    
-    # Faster encoding with optimized parameters
     buffered = io.BytesIO()
-    pil_image.save(buffered, format="PNG", optimize=True, compress_level=1)
+    pil_image.save(buffered, format="JPEG", quality=90, optimize=False)
     img_str = base64.b64encode(buffered.getvalue()).decode("utf-8")
+    
+    encoding_time = time.time() - encoding_start
+    print(f"📦 Encoding: {encoding_time:.3f}s")
     
     # Create coordinates list
     coordinates_list = []
@@ -210,6 +216,10 @@ def detect_fast(
             "bbox": [float(box[0]), float(box[1]), float(box[2]), float(box[3])],
             "confidence": float(conf)
         })
+    
+    total_time = time.time() - start_time
+    print(f"🚀 TOTAL TIME: {total_time:.3f}s")
+    print(f"🎯 DETECTED: {len(boxes)} elements")
     
     return DetectResponse(
         image=img_str,
@@ -261,26 +271,25 @@ def process(
 @app.post("/detect_elements", response_model=DetectResponse)
 async def detect_elements(
     image_file: UploadFile = File(...),
-    box_threshold: Annotated[float, Query(ge=0.01, le=1.0)] = 0.03,  # Lower for more detections
-    iou_threshold: Annotated[float, Query(ge=0.01, le=1.0)] = 0.15,  # Higher for less filtering  
-    imgsz: Annotated[int, Query(ge=640, le=3200)] = 1280,  # Optimized size for speed
+    box_threshold: Annotated[float, Query(ge=0.01, le=1.0)] = 0.01,  # Ultra-low for max detections
+    iou_threshold: Annotated[float, Query(ge=0.01, le=1.0)] = 0.3,   # High for more overlaps
+    imgsz: Annotated[int, Query(ge=640, le=3200)] = 640,  # Force smallest size for speed
 ):
     """
-    ⚡ ULTRA-FAST: Detect UI elements with optimized speed and accuracy
+    🚀 EXTREME SPEED: Target <1 second response time
     
-    Returns coordinates and annotated image in ~1-2 seconds for instant GUI automation.
-    
-    Performance Optimizations:
-    - Adaptive image sizing for speed
-    - Lower detection thresholds for better accuracy  
-    - Streamlined annotation pipeline
-    - Optimized YOLO inference
+    Ultra-aggressive optimizations for near-instant GUI automation:
+    - Force tiny inference size (640px max)
+    - Ultra-low detection thresholds (0.01)
+    - FP16 precision for speed
+    - Minimal annotation pipeline
+    - JPEG encoding for speed
     
     Args:
         image_file (UploadFile): The image file to process
-        box_threshold (float): Confidence threshold for detections, default=0.03 (lower = more detections)
-        iou_threshold (float): Overlap threshold for removing duplicates, default=0.15 (higher = less filtering)  
-        imgsz (int): Max detection image size, default=1280 (optimized for speed)
+        box_threshold (float): Confidence threshold, default=0.01 (ultra-low for max detections)
+        iou_threshold (float): Overlap threshold, default=0.3 (high for more overlaps)  
+        imgsz (int): Max inference size, default=640 (forced small for speed)
     """
     try:
         contents = await image_file.read()
