@@ -802,6 +802,229 @@ def detect_fast_ultra(
         coordinates=json.dumps(coordinates_list)
     )
 
+@torch.inference_mode()
+def detect_fast_super(
+    image_input,
+    box_threshold,
+    iou_threshold,
+    imgsz,
+) -> Optional[DetectResponse]:
+    """SUPER FAST: Single-pass YOLO with extreme optimization for <3s response"""
+    
+    import cv2
+    import numpy as np
+    import time
+    import supervision as sv
+    from supervision.draw.color import ColorPalette
+    from ultralytics import YOLO
+    
+    start_time = time.time()
+    
+    # SPEED HACK 1: Minimal file I/O
+    original_width, original_height = image_input.size
+    
+    # SPEED HACK 2: Aggressive but smart sizing
+    if original_width > 1280 or original_height > 720:
+        # Force smaller size for large images
+        scale = min(1280 / original_width, 720 / original_height)
+        new_width = int(original_width * scale)
+        new_height = int(original_height * scale)
+        
+        # Fast resize
+        image_resized = image_input.resize((new_width, new_height), Image.Resampling.BILINEAR)
+        image_save_path = 'imgs/super_fast.jpg'  # Use JPEG for speed
+        image_resized.save(image_save_path, quality=85, optimize=False)
+        scale_factor = scale
+    else:
+        # Direct save for smaller images
+        image_save_path = 'imgs/super_fast_orig.jpg'
+        image_input.save(image_save_path, quality=85, optimize=False)
+        scale_factor = 1.0
+    
+    # ACCURACY HACK: Single-pass with optimized parameters
+    print("🚀 Super-fast single YOLO pass...")
+    inference_start = time.time()
+    
+    # CRITICAL: Use optimized parameters for both speed AND accuracy
+    results = yolo_model(
+        image_save_path,
+        imgsz=min(1024, imgsz),  # Balanced size for speed
+        conf=0.005,  # VERY low threshold to catch everything
+        iou=0.05,   # Very low IOU to keep more detections
+        verbose=False,
+        device='cuda' if torch.cuda.is_available() else 'cpu',
+        half=True,  # FP16 for speed
+        agnostic_nms=False,  # Use class-aware NMS for better results
+        max_det=500,  # Allow many detections
+    )
+    
+    inference_time = time.time() - inference_start
+    print(f"🚀 Single inference: {inference_time:.3f}s")
+    
+    # Extract and scale boxes
+    all_boxes = []
+    all_confidences = []
+    
+    if len(results) > 0 and results[0].boxes is not None:
+        boxes_tensor = results[0].boxes.xyxy.cpu()
+        conf_tensor = results[0].boxes.conf.cpu()
+        
+        for box, conf in zip(boxes_tensor, conf_tensor):
+            x1, y1, x2, y2 = box.tolist()
+            
+            # Scale back to original coordinates
+            if scale_factor != 1.0:
+                x1_orig = x1 / scale_factor
+                y1_orig = y1 / scale_factor
+                x2_orig = x2 / scale_factor
+                y2_orig = y2 / scale_factor
+            else:
+                x1_orig, y1_orig, x2_orig, y2_orig = x1, y1, x2, y2
+            
+            # Ensure coordinates are within bounds
+            x1_orig = max(0, min(x1_orig, original_width))
+            y1_orig = max(0, min(y1_orig, original_height))
+            x2_orig = max(0, min(x2_orig, original_width))
+            y2_orig = max(0, min(y2_orig, original_height))
+            
+            # Filter out tiny boxes (noise)
+            width = x2_orig - x1_orig
+            height = y2_orig - y1_orig
+            if width > 5 and height > 5:  # Minimum size filter
+                all_boxes.append([x1_orig, y1_orig, x2_orig, y2_orig])
+                all_confidences.append(float(conf))
+    
+    print(f"🎯 Raw detections: {len(all_boxes)}")
+    
+    # SPEED HACK 3: Minimal post-processing
+    processing_start = time.time()
+    
+    # Simple overlap removal (faster than advanced NMS)
+    if len(all_boxes) > 1:
+        # Quick and dirty overlap removal
+        final_boxes = []
+        final_confidences = []
+        
+        # Sort by confidence (keep highest confidence boxes)
+        sorted_indices = sorted(range(len(all_confidences)), key=lambda i: all_confidences[i], reverse=True)
+        
+        for i in sorted_indices:
+            box_i = all_boxes[i]
+            conf_i = all_confidences[i]
+            
+            # Check if this box overlaps significantly with any already kept box
+            keep = True
+            for kept_box in final_boxes:
+                # Calculate overlap
+                x1_max = max(box_i[0], kept_box[0])
+                y1_max = max(box_i[1], kept_box[1])
+                x2_min = min(box_i[2], kept_box[2])
+                y2_min = min(box_i[3], kept_box[3])
+                
+                if x1_max < x2_min and y1_max < y2_min:
+                    # There is overlap
+                    overlap_area = (x2_min - x1_max) * (y2_min - y1_max)
+                    box_i_area = (box_i[2] - box_i[0]) * (box_i[3] - box_i[1])
+                    kept_box_area = (kept_box[2] - kept_box[0]) * (kept_box[3] - kept_box[1])
+                    
+                    # If overlap is significant, skip this box
+                    if overlap_area > 0.3 * min(box_i_area, kept_box_area):
+                        keep = False
+                        break
+            
+            if keep:
+                final_boxes.append(box_i)
+                final_confidences.append(conf_i)
+        
+        filtered_boxes = final_boxes
+        filtered_confidences = final_confidences
+    else:
+        filtered_boxes = all_boxes
+        filtered_confidences = all_confidences
+    
+    processing_time = time.time() - processing_start
+    print(f"🎯 Fast filtering: {processing_time:.3f}s, final elements: {len(filtered_boxes)}")
+    
+    # SPEED HACK 4: Ultra-fast annotation
+    annotation_start = time.time()
+    
+    # Convert to cv2 format
+    image_np = np.array(image_input)
+    image_cv = cv2.cvtColor(image_np, cv2.COLOR_RGB2BGR)
+    image_cv = cv2.cvtColor(image_cv, cv2.COLOR_BGR2RGB)
+    
+    if filtered_boxes:
+        # Fast color cycling
+        base_colors = [
+            (255, 0, 0), (0, 255, 0), (0, 0, 255), (255, 255, 0), (255, 0, 255),
+            (0, 255, 255), (255, 128, 0), (128, 255, 0), (0, 128, 255), (255, 0, 128)
+        ]
+        
+        box_overlay_ratio = min(1.0, original_width / 1920)  # Cap scaling
+        
+        # Optimized annotation parameters
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        text_scale = max(0.4 * box_overlay_ratio, 0.3)
+        text_thickness = max(int(1.5 * box_overlay_ratio), 1)
+        box_thickness = max(int(2 * box_overlay_ratio), 1)
+        
+        for i, (box, conf) in enumerate(zip(filtered_boxes, filtered_confidences)):
+            x1, y1, x2, y2 = map(int, box)
+            
+            # Fast color selection
+            color = base_colors[i % len(base_colors)]
+            
+            # Draw box
+            cv2.rectangle(image_cv, (x1, y1), (x2, y2), color, box_thickness)
+            
+            # Minimal label
+            label = str(i)
+            
+            # Fast label positioning (no complex calculations)
+            label_x = x1 + 2
+            label_y = y1 - 5 if y1 > 20 else y1 + 20
+            
+            # Simple background
+            (text_width, text_height), _ = cv2.getTextSize(label, font, text_scale, text_thickness)
+            cv2.rectangle(image_cv, (label_x - 1, label_y - text_height - 1), 
+                         (label_x + text_width + 1, label_y + 1), color, cv2.FILLED)
+            
+            # High contrast text
+            cv2.putText(image_cv, label, (label_x, label_y), font, text_scale, (255, 255, 255), text_thickness)
+    
+    annotation_time = time.time() - annotation_start
+    print(f"🎨 Fast annotation: {annotation_time:.3f}s")
+    
+    # SPEED HACK 5: Ultra-fast encoding
+    encoding_start = time.time()
+    
+    pil_image = Image.fromarray(image_cv)
+    buffered = io.BytesIO()
+    pil_image.save(buffered, format="JPEG", quality=85, optimize=False)  # Fast JPEG
+    img_str = base64.b64encode(buffered.getvalue()).decode("utf-8")
+    
+    encoding_time = time.time() - encoding_start
+    print(f"📦 Fast encoding: {encoding_time:.3f}s")
+    
+    # Create coordinates list
+    coordinates_list = []
+    for i, (box, conf) in enumerate(zip(filtered_boxes, filtered_confidences)):
+        coordinates_list.append({
+            "id": i,
+            "bbox": [float(box[0]), float(box[1]), float(box[2]), float(box[3])],
+            "confidence": float(conf)
+        })
+    
+    total_time = time.time() - start_time
+    print(f"🚀 TOTAL TIME (SUPER): {total_time:.3f}s")
+    print(f"🎯 DETECTED: {len(coordinates_list)} elements")
+    print(f"⚡ BREAKDOWN: Inference={inference_time:.3f}s, Process={processing_time:.3f}s, Annotate={annotation_time:.3f}s, Encode={encoding_time:.3f}s")
+    
+    return DetectResponse(
+        image=img_str,
+        coordinates=json.dumps(coordinates_list)
+    )
+
 @app.post("/detect_elements", response_model=DetectResponse)
 async def detect_elements(
     image_file: UploadFile = File(...),
@@ -964,4 +1187,38 @@ async def detect_elements_ultra(
         raise HTTPException(status_code=400, detail="Invalid image file")
 
     response = detect_fast_ultra(image_input, box_threshold, iou_threshold, imgsz)
+    return response
+
+@app.post("/detect_elements_super", response_model=DetectResponse)
+async def detect_elements_super(
+    image_file: UploadFile = File(...),
+    box_threshold: Annotated[float, Query(ge=0.001, le=1.0)] = 0.005,  # Very low for max coverage
+    iou_threshold: Annotated[float, Query(ge=0.01, le=1.0)] = 0.05,   # Very low IOU
+    imgsz: Annotated[int, Query(ge=640, le=3200)] = 1024,  # Balanced for speed
+):
+    """
+    💥 SUPER FAST: Single-pass optimized YOLO for maximum speed + accuracy
+    
+    Extreme single-pass optimization targeting <3 seconds:
+    - 🚀 Single YOLO pass (no multi-pass overhead)
+    - ⚡ JPEG processing for speed
+    - 🎯 Ultra-low thresholds (0.005 confidence, 0.05 IOU)
+    - 💨 Fast overlap removal (not complex NMS)
+    - 🔥 Target: <3 seconds with 100+ elements
+    
+    Should be faster than ultra while catching more elements!
+    
+    Args:
+        image_file (UploadFile): The image file to process
+        box_threshold (float): Confidence threshold, default=0.005 (ultra-low)
+        iou_threshold (float): Overlap threshold, default=0.05 (very low)
+        imgsz (int): Max inference size, default=1024 (speed optimized)
+    """
+    try:
+        contents = await image_file.read()
+        image_input = Image.open(io.BytesIO(contents)).convert("RGB")
+    except Exception as e:
+        raise HTTPException(status_code=400, detail="Invalid image file")
+
+    response = detect_fast_super(image_input, box_threshold, iou_threshold, imgsz)
     return response
