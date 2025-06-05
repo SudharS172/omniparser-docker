@@ -955,12 +955,12 @@ def detect_fast_super(
     # PROFESSIONAL ANNOTATION: Use the same system as process_image
     annotation_start = time.time()
     
+    # Import required libraries at the top to avoid scoping issues
+    import supervision as sv
+    from supervision.draw.color import ColorPalette
+    from torchvision.ops import box_convert
+    
     if filtered_boxes:
-        # Convert to the same format as process_image for professional annotation
-        import supervision as sv
-        from supervision.draw.color import ColorPalette
-        from torchvision.ops import box_convert
-        import torch
         
         # Convert boxes to the same format as process_image
         boxes_xyxy = torch.tensor(filtered_boxes)
