@@ -1,4 +1,8 @@
 import os
+import sys
+
+# Add vendor/omniparser to Python path
+sys.path.append(os.path.join(os.path.dirname(__file__), 'vendor', 'omniparser'))
 
 from fastapi import FastAPI, File, UploadFile, HTTPException, Query
 from pydantic import BaseModel
@@ -8,7 +12,7 @@ import json
 
 import base64
 
-from vendor.omniparser.utils import check_ocr_box, get_caption_model_processor, get_som_labeled_img
+from utils import check_ocr_box, get_caption_model_processor, get_som_labeled_img, get_yolo_model
 import torch
 from PIL import Image
 
@@ -16,15 +20,6 @@ from huggingface_hub import snapshot_download
 from loguru import logger
 
 DEVICE = torch.device('cuda')
-
-def get_yolo_model(model_path):
-    from ultralytics import YOLO
-    # Load the model.
-    try:
-        model = YOLO(model_path).to(DEVICE)
-    except:
-        model = YOLO(model_path)
-    return model
 
 logger.info("Initializing OmniParser API...")
 
