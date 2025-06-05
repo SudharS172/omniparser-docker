@@ -952,81 +952,60 @@ def detect_fast_super(
     processing_time = time.time() - processing_start
     print(f"🎯 Improved filtering: {processing_time:.3f}s, final elements: {len(filtered_boxes)}")
     
-    # SPEED HACK 4: High-quality but fast annotation
+    # PROFESSIONAL ANNOTATION: Use the same system as process_image
     annotation_start = time.time()
     
-    # Convert to cv2 format
-    image_np = np.array(image_input)
-    image_cv = cv2.cvtColor(image_np, cv2.COLOR_RGB2BGR)
-    image_cv = cv2.cvtColor(image_cv, cv2.COLOR_BGR2RGB)
-    
     if filtered_boxes:
-        # Professional color palette (better visibility)
-        colors = [
-            (255, 0, 0),    # Red
-            (0, 255, 0),    # Green  
-            (0, 0, 255),    # Blue
-            (255, 165, 0),  # Orange
-            (255, 0, 255),  # Magenta
-            (0, 255, 255),  # Cyan
-            (255, 255, 0),  # Yellow
-            (128, 0, 128),  # Purple
-            (255, 192, 203), # Pink
-            (0, 128, 0),    # Dark Green
-            (128, 128, 0),  # Olive
-            (0, 0, 128),    # Navy
-            (128, 0, 0),    # Maroon
-            (0, 128, 128),  # Teal
-            (192, 192, 192) # Silver
-        ]
+        # Convert to the same format as process_image for professional annotation
+        import supervision as sv
+        from supervision.draw.color import ColorPalette
+        from torchvision.ops import box_convert
+        import torch
         
-        box_overlay_ratio = min(1.0, original_width / 1920)  # Cap scaling
+        # Convert boxes to the same format as process_image
+        boxes_xyxy = torch.tensor(filtered_boxes)
+        detections = sv.Detections(xyxy=boxes_xyxy.numpy())
         
-        # IMPROVED: Thinner, cleaner annotation parameters
-        font = cv2.FONT_HERSHEY_SIMPLEX
-        text_scale = max(0.5 * box_overlay_ratio, 0.4)  # Slightly larger text
-        text_thickness = max(int(1.5 * box_overlay_ratio), 1)
-        box_thickness = max(int(1.5 * box_overlay_ratio), 1)  # THINNER boxes
-        text_padding = max(int(4 * box_overlay_ratio), 3)
+        # Use the SAME scaling formula as process_image
+        box_overlay_ratio = image_input.size[0] / 3200
         
-        for i, (box, conf) in enumerate(zip(filtered_boxes, filtered_confidences)):
-            x1, y1, x2, y2 = map(int, box)
-            
-            # Use color from palette
-            color = colors[i % len(colors)]
-            
-            # Draw THINNER box
-            cv2.rectangle(image_cv, (x1, y1), (x2, y2), color, box_thickness)
-            
-            # Better label positioning
-            label = str(i)
-            (text_width, text_height), _ = cv2.getTextSize(label, font, text_scale, text_thickness)
-            
-            # Smart positioning to avoid overlaps and edges
-            label_x = x1 + 2
-            label_y = y1 - text_padding
-            
-            # If label would go outside image bounds, reposition
-            if label_y - text_height < 0:
-                label_y = y1 + text_height + text_padding  # Move inside box
-            if label_x + text_width > original_width - 5:
-                label_x = max(0, x2 - text_width - 2)  # Move to right side of box
-            
-            # HIGH CONTRAST background for text
-            bg_x1 = label_x - 2
-            bg_y1 = label_y - text_height - 2
-            bg_x2 = label_x + text_width + 2
-            bg_y2 = label_y + 2
-            
-            # Dark background for light text or light background for dark text
-            bg_color = (0, 0, 0) if sum(color) > 400 else (255, 255, 255)
-            cv2.rectangle(image_cv, (bg_x1, bg_y1), (bg_x2, bg_y2), bg_color, cv2.FILLED)
-            
-            # HIGH CONTRAST text color
-            text_color = (255, 255, 255) if sum(color) > 400 else (0, 0, 0)
-            
-            # Draw crisp text with anti-aliasing
-            cv2.putText(image_cv, label, (label_x, label_y), font, text_scale, text_color, text_thickness, cv2.LINE_AA)
+        # Use the SAME annotation config as process_image
+        draw_bbox_config = {
+            'text_scale': 0.8 * box_overlay_ratio,
+            'text_thickness': max(int(2 * box_overlay_ratio), 1),
+            'text_padding': max(int(3 * box_overlay_ratio), 1),
+            'thickness': max(int(3 * box_overlay_ratio), 1),
+        }
+        
+        # Use the SAME professional BoxAnnotator as process_image
+        from util.box_annotator import BoxAnnotator
+        box_annotator = BoxAnnotator(
+            color=ColorPalette.DEFAULT,  # Same color palette as process_image
+            thickness=draw_bbox_config['thickness'],
+            text_scale=draw_bbox_config['text_scale'],
+            text_thickness=draw_bbox_config['text_thickness'],
+            text_padding=draw_bbox_config['text_padding'],
+            avoid_overlap=True
+        )
+        
+        # Create labels (just numbers like process_image)
+        labels = [str(i) for i in range(len(filtered_boxes))]
+        
+        # Convert image to numpy array for annotation
+        image_np = np.array(image_input)
+        
+        # Apply the SAME professional annotation as process_image
+        annotated_frame = box_annotator.annotate(
+            scene=image_np.copy(),
+            detections=detections,
+            labels=labels,
+            image_size=(image_input.size[0], image_input.size[1])
+        )
+        
+        image_cv = annotated_frame
+    else:
+        # No boxes to annotate
+        image_cv = np.array(image_input)
     
     annotation_time = time.time() - annotation_start
     print(f"🎨 High-quality annotation: {annotation_time:.3f}s")
