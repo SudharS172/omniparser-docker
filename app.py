@@ -93,42 +93,51 @@ def detect_fast(
         boxes = boxes_tensor.tolist()
         confidences = conf_tensor.tolist()
     
-    # Draw bounding boxes on the original image
+    # Use the professional annotation system like normal processing
     import cv2
     import numpy as np
+    import supervision as sv
+    from util.box_annotator import BoxAnnotator
     
     # Load image with OpenCV for annotation
     image_cv = cv2.imread(image_save_path)
     image_cv = cv2.cvtColor(image_cv, cv2.COLOR_BGR2RGB)
     
-    # Calculate box overlay ratio for text scaling
+    # Calculate box overlay ratio for scaling (same as normal processing)
     box_overlay_ratio = image_input.size[0] / 3200
     
-    # Draw boxes
-    for i, (box, conf) in enumerate(zip(boxes, confidences)):
-        x1, y1, x2, y2 = map(int, box)
+    # Create detections object for professional annotation
+    if boxes:
+        xyxy = np.array(boxes)
+        detections = sv.Detections(xyxy=xyxy)
         
-        # Draw rectangle
-        color = (0, 255, 0)  # Green
-        thickness = max(int(3 * box_overlay_ratio), 1)
-        cv2.rectangle(image_cv, (x1, y1), (x2, y2), color, thickness)
+        # Create labels with simple numbering (clean and readable)
+        labels = [str(i) for i in range(len(boxes))]
         
-        # Draw label
-        label = f"element_{i}"
-        font_scale = 0.8 * box_overlay_ratio
-        font_thickness = max(int(2 * box_overlay_ratio), 1)
+        # Use the same professional BoxAnnotator as normal processing
+        box_annotator = BoxAnnotator(
+            text_scale=0.8 * box_overlay_ratio,
+            text_padding=max(int(3 * box_overlay_ratio), 1), 
+            text_thickness=max(int(2 * box_overlay_ratio), 1),
+            thickness=max(int(3 * box_overlay_ratio), 1),
+            avoid_overlap=True  # This prevents overlapping text!
+        )
         
-        # Get text size
-        (text_width, text_height), baseline = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, font_scale, font_thickness)
+        # Get image dimensions for overlap detection
+        h, w = image_cv.shape[:2]
         
-        # Draw text background
-        cv2.rectangle(image_cv, (x1, y1 - text_height - 10), (x1 + text_width, y1), color, -1)
-        
-        # Draw text
-        cv2.putText(image_cv, label, (x1, y1 - 5), cv2.FONT_HERSHEY_SIMPLEX, font_scale, (0, 0, 0), font_thickness)
+        # Apply professional annotation
+        annotated_frame = box_annotator.annotate(
+            scene=image_cv, 
+            detections=detections, 
+            labels=labels, 
+            image_size=(w, h)
+        )
+    else:
+        annotated_frame = image_cv
     
     # Convert back to PIL Image
-    pil_image = Image.fromarray(image_cv)
+    pil_image = Image.fromarray(annotated_frame)
     
     # Encode image to base64
     buffered = io.BytesIO()
