@@ -227,6 +227,210 @@ def detect_fast(
     )
 
 @torch.inference_mode()
+def detect_fast_pro(
+    image_input,
+    box_threshold,
+    iou_threshold,
+    imgsz,
+) -> Optional[DetectResponse]:
+    """HYBRID APPROACH: Professional quality + optimized speed"""
+    
+    import cv2
+    import numpy as np
+    import time
+    import supervision as sv
+    from supervision.draw.color import ColorPalette
+    
+    start_time = time.time()
+    
+    # ACCURACY FIX 1: Proper image handling without quality loss
+    original_width, original_height = image_input.size
+    
+    # SPEED OPTIMIZATION: Smart sizing (not too aggressive to maintain accuracy)
+    # Use 896px instead of 640px for better accuracy vs speed balance
+    target_size = min(896, imgsz)
+    
+    # Calculate proper scaling
+    scale = min(target_size / original_width, target_size / original_height)
+    
+    # Only resize if significantly larger (avoid unnecessary processing)
+    if scale < 0.8:
+        new_width = int(original_width * scale)
+        new_height = int(original_height * scale)
+        # High quality resize
+        image_resized = image_input.resize((new_width, new_height), Image.Resampling.LANCZOS)
+        image_save_path = 'imgs/fast_pro_resized.png'
+        image_resized.save(image_save_path)
+        scale_factor = scale
+    else:
+        # Use original size for small images
+        image_save_path = 'imgs/fast_pro_original.png'
+        image_input.save(image_save_path)
+        scale_factor = 1.0
+    
+    # ACCURACY FIX 2: Optimized thresholds (not too aggressive)
+    optimized_threshold = max(0.02, box_threshold)  # Not ultra-low to avoid noise
+    optimized_iou = min(0.2, iou_threshold)  # Balanced filtering
+    
+    # SPEED OPTIMIZATION: Efficient YOLO inference
+    from ultralytics import YOLO
+    
+    inference_start = time.time()
+    results = yolo_model(
+        image_save_path,
+        imgsz=target_size,
+        conf=optimized_threshold,
+        iou=optimized_iou,
+        verbose=False,
+        device='cuda' if torch.cuda.is_available() else 'cpu',
+        half=True,  # FP16 for speed
+    )
+    inference_time = time.time() - inference_start
+    print(f"🔥 YOLO inference (PRO): {inference_time:.3f}s")
+    
+    # ACCURACY FIX 3: Precise coordinate scaling
+    boxes = []
+    confidences = []
+    
+    if len(results) > 0 and results[0].boxes is not None:
+        boxes_tensor = results[0].boxes.xyxy.cpu()
+        conf_tensor = results[0].boxes.conf.cpu()
+        
+        # CRITICAL: Proper coordinate scaling back to original image
+        for box in boxes_tensor:
+            x1, y1, x2, y2 = box.tolist()
+            
+            # Scale back to original coordinates with precision
+            if scale_factor != 1.0:
+                x1_orig = x1 / scale_factor
+                y1_orig = y1 / scale_factor
+                x2_orig = x2 / scale_factor
+                y2_orig = y2 / scale_factor
+            else:
+                x1_orig, y1_orig, x2_orig, y2_orig = x1, y1, x2, y2
+            
+            # Ensure coordinates are within image bounds
+            x1_orig = max(0, min(x1_orig, original_width))
+            y1_orig = max(0, min(y1_orig, original_height))
+            x2_orig = max(0, min(x2_orig, original_width))
+            y2_orig = max(0, min(y2_orig, original_height))
+            
+            boxes.append([x1_orig, y1_orig, x2_orig, y2_orig])
+        
+        confidences = conf_tensor.tolist()
+    
+    # QUALITY FIX 4: Professional annotation system (like normal processing)
+    annotation_start = time.time()
+    
+    # Use original image for annotation
+    image_np = np.array(image_input)
+    if len(image_np.shape) == 3:
+        image_cv = cv2.cvtColor(image_np, cv2.COLOR_RGB2BGR)
+        image_cv = cv2.cvtColor(image_cv, cv2.COLOR_BGR2RGB)
+    
+    if boxes:
+        # QUALITY FIX 5: Use professional supervision library like normal processing
+        xyxy = np.array(boxes)
+        detections = sv.Detections(xyxy=xyxy)
+        
+        # Calculate scaling for text/thickness (same as normal processing)
+        box_overlay_ratio = original_width / 3200
+        
+        # HIGH CONTRAST COLOR PALETTE for better readability
+        colors = ColorPalette.DEFAULT
+        
+        # Professional annotation parameters
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        text_scale = max(0.6 * box_overlay_ratio, 0.4)  # Larger text
+        text_thickness = max(int(2 * box_overlay_ratio), 1)
+        box_thickness = max(int(2 * box_overlay_ratio), 2)
+        text_padding = max(int(4 * box_overlay_ratio), 3)
+        
+        for i, (box, conf) in enumerate(zip(boxes, confidences)):
+            x1, y1, x2, y2 = map(int, box)
+            
+            # READABILITY FIX: High contrast color system
+            color = colors.by_idx(i)
+            color_rgb = color.as_rgb()
+            color_bgr = (color_rgb[2], color_rgb[1], color_rgb[0])
+            
+            # Draw professional box
+            cv2.rectangle(image_cv, (x1, y1), (x2, y2), color_bgr, box_thickness)
+            
+            # READABILITY FIX: Smart label positioning and contrast
+            label = str(i)
+            
+            # Calculate text size
+            (text_width, text_height), baseline = cv2.getTextSize(
+                label, font, text_scale, text_thickness
+            )
+            
+            # Smart positioning (avoid overlap with image edges)
+            label_x = x1
+            label_y = y1 - text_padding
+            
+            # Adjust if text would go outside image
+            if label_y - text_height < 0:
+                label_y = y1 + text_height + text_padding
+            if label_x + text_width > original_width:
+                label_x = original_width - text_width - text_padding
+            if label_x < 0:
+                label_x = text_padding
+            
+            # CONTRAST FIX: High contrast background
+            bg_x1 = label_x - text_padding
+            bg_y1 = label_y - text_height - text_padding
+            bg_x2 = label_x + text_width + text_padding
+            bg_y2 = label_y + text_padding
+            
+            # Draw text background with same color as box
+            cv2.rectangle(image_cv, (bg_x1, bg_y1), (bg_x2, bg_y2), color_bgr, cv2.FILLED)
+            
+            # CONTRAST FIX: Auto white/black text for maximum readability
+            luminance = 0.299 * color_rgb[0] + 0.587 * color_rgb[1] + 0.114 * color_rgb[2]
+            text_color = (0, 0, 0) if luminance > 140 else (255, 255, 255)
+            
+            # Draw high-contrast text
+            cv2.putText(
+                image_cv, label, (label_x, label_y), 
+                font, text_scale, text_color, text_thickness, cv2.LINE_AA
+            )
+    
+    annotation_time = time.time() - annotation_start
+    print(f"🎨 Professional annotation: {annotation_time:.3f}s")
+    
+    # SPEED OPTIMIZATION: Balanced encoding (PNG for quality, optimized compression)
+    encoding_start = time.time()
+    
+    pil_image = Image.fromarray(image_cv)
+    buffered = io.BytesIO()
+    # Use PNG with moderate compression for quality balance
+    pil_image.save(buffered, format="PNG", optimize=True, compress_level=3)
+    img_str = base64.b64encode(buffered.getvalue()).decode("utf-8")
+    
+    encoding_time = time.time() - encoding_start
+    print(f"📦 Encoding: {encoding_time:.3f}s")
+    
+    # Create precise coordinates list
+    coordinates_list = []
+    for i, (box, conf) in enumerate(zip(boxes, confidences)):
+        coordinates_list.append({
+            "id": i,
+            "bbox": [float(box[0]), float(box[1]), float(box[2]), float(box[3])],
+            "confidence": float(conf)
+        })
+    
+    total_time = time.time() - start_time
+    print(f"🚀 TOTAL TIME (PRO): {total_time:.3f}s")
+    print(f"🎯 DETECTED: {len(boxes)} elements")
+    print(f"📏 SCALE FACTOR: {scale_factor:.3f}")
+    
+    return DetectResponse(
+        image=img_str,
+        coordinates=json.dumps(coordinates_list)
+    )
+
+@torch.inference_mode()
 # @torch.autocast(device_type="cuda", dtype=torch.bfloat16)
 def process(
     image_input,
@@ -298,6 +502,39 @@ async def detect_elements(
         raise HTTPException(status_code=400, detail="Invalid image file")
 
     response = detect_fast(image_input, box_threshold, iou_threshold, imgsz)
+    return response
+
+@app.post("/detect_elements_pro", response_model=DetectResponse)
+async def detect_elements_pro(
+    image_file: UploadFile = File(...),
+    box_threshold: Annotated[float, Query(ge=0.01, le=1.0)] = 0.05,  # Balanced threshold
+    iou_threshold: Annotated[float, Query(ge=0.01, le=1.0)] = 0.15,  # Balanced filtering
+    imgsz: Annotated[int, Query(ge=640, le=3200)] = 896,  # Sweet spot for speed vs accuracy
+):
+    """
+    🎯 PROFESSIONAL FAST: High-quality annotations + good speed
+    
+    Professional approach for production-ready GUI automation:
+    - ✅ Accurate box positioning (proper scaling)
+    - ✅ Professional annotations (high contrast, readable)
+    - ✅ Smart image sizing (896px for speed/accuracy balance)
+    - ✅ Quality color palette with auto contrast
+    - ✅ Precise coordinate mapping
+    - ✅ Beautiful results like normal processing but faster
+    
+    Args:
+        image_file (UploadFile): The image file to process
+        box_threshold (float): Confidence threshold, default=0.05 (balanced detection)
+        iou_threshold (float): Overlap threshold, default=0.15 (balanced filtering)  
+        imgsz (int): Max inference size, default=896 (speed/accuracy sweet spot)
+    """
+    try:
+        contents = await image_file.read()
+        image_input = Image.open(io.BytesIO(contents)).convert("RGB")
+    except Exception as e:
+        raise HTTPException(status_code=400, detail="Invalid image file")
+
+    response = detect_fast_pro(image_input, box_threshold, iou_threshold, imgsz)
     return response
 
 @app.post("/process_image", response_model=ProcessResponse)
