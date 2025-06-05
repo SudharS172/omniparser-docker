@@ -28,9 +28,13 @@ WORKDIR /app
 COPY ./vendor ./vendor
 COPY app.py app.py
 
+# Create __init__.py files to make vendor a proper Python package
+RUN touch /app/vendor/__init__.py && touch /app/vendor/omniparser/__init__.py
+
 RUN mkdir -p /root/.cache/huggingface /root/.config/matplotlib \
     /root/.paddleocr /root/.EasyOCR /app/imgs
 
-ENV PYTHONPATH=/app/vendor/omniparser
+# Set PYTHONPATH to include the app directory
+ENV PYTHONPATH=/app
 
 CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "7860"]
