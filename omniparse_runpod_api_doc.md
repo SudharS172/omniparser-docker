@@ -19,13 +19,37 @@ The OmniParser API is a high-performance REST API for GUI element detection and 
 
 ## ⚡ Quick Start
 
+### ✅ Correct Usage (Python)
+```python
+import requests
+
+response = requests.post(
+    "https://c2yfcdc14566pt-7860.proxy.runpod.net/detect_elements_super",
+    files={"image_file": open("screenshot.png", "rb")},
+    data={"box_threshold": 0.005, "iou_threshold": 0.05, "imgsz": 1024}
+)
+
+# ✅ Direct JSON object access - no parsing needed!
+result = response.json()  # Already a Python dict
+elements = result['elements']  # Already a Python list
+print(f"Found {len(elements)} elements")
+```
+
+### ✅ Correct Usage (JavaScript)
+```javascript
+const response = await fetch(url, {method: 'POST', body: formData});
+const result = await response.json();  // Already a JavaScript object
+console.log(`Found ${result.elements.length} elements`);
+```
+
+### ⚠️ For Terminal Testing Only
 ```bash
-curl -X POST "https://your-runpod-url.proxy.runpod.net/detect_elements_super" \
+curl -X POST "https://c2yfcdc14566pt-7860.proxy.runpod.net/detect_elements_super" \
   -H "Content-Type: multipart/form-data" \
   -F "image_file=@screenshot.png" \
   -F "box_threshold=0.005" \
   -F "iou_threshold=0.05" \
-  -F "imgsz=1024"
+  -F "imgsz=1024" | python3 -c "import sys,json; data=json.load(sys.stdin); print(f'Elements: {len(data[\"elements\"])}')"
 ```
 
 ## 🎯 API Endpoints
@@ -41,67 +65,86 @@ curl -X POST "https://your-runpod-url.proxy.runpod.net/detect_elements_super" \
 | `/detect_elements_accurate` | < 10 sec | High accuracy needs | Full pipeline - AI captions |
 | `/process_image` | 30-60 sec | Complete analysis | Full OCR + AI descriptions |
 
-### 1. `/detect_elements_super` ⭐ **RECOMMENDED**
+### 1. `/detect_elements` - ⚡ Ultra-Fast Detection
 
-**Best overall choice** - Professional styling with excellent speed.
-
-**Parameters:**
-- `box_threshold` (float): 0.001-1.0, default=0.005
-- `iou_threshold` (float): 0.01-1.0, default=0.05  
-- `imgsz` (int): 640-3200, default=1024
-
-**Features:**
-- ✅ Same visual styling as full process_image
-- ✅ Professional color palette and borders
-- ✅ Target: < 3 seconds
-- ✅ Detects 100+ elements typically
-
-### 2. `/detect_elements` 🚀 **FASTEST**
-
-**Ultra-speed for real-time automation**
+**Speed**: <1 second | **Accuracy**: Good | **Best for**: Real-time applications
 
 **Parameters:**
-- `box_threshold` (float): 0.01-1.0, default=0.01
-- `iou_threshold` (float): 0.01-1.0, default=0.3
-- `imgsz` (int): 640-3200, default=640
+- `image_file` (file, required): Image to process
+- `box_threshold` (float, 0.01-1.0): Confidence threshold, default=0.01
+- `iou_threshold` (float, 0.01-1.0): Overlap filtering, default=0.3  
+- `imgsz` (int, 640-3200): Processing size, default=640
+- `normalized_coordinates` (bool): Return 0-1 coordinates instead of pixels, default=false
 
-**Features:**
-- ⚡ Target: < 1 second
-- 🔥 FP16 precision for speed
-- 📦 JPEG encoding for faster response
-- ⚠️ Basic annotation quality
+**Trade-offs**: Fastest speed, basic annotations, good for rapid prototyping
 
-### 3. `/detect_elements_pro` 💼 **PROFESSIONAL**
+### 2. `/detect_elements_super` - 🚀 Super-Fast Detection
 
-**High-quality annotations with good speed**
+**Speed**: 3-5 seconds | **Accuracy**: Excellent | **Best for**: Production applications
 
 **Parameters:**
-- `box_threshold` (float): 0.01-1.0, default=0.05
-- `iou_threshold` (float): 0.01-1.0, default=0.15
-- `imgsz` (int): 640-3200, default=896
+- `image_file` (file, required): Image to process
+- `box_threshold` (float, 0.001-1.0): Confidence threshold, default=0.005
+- `iou_threshold` (float, 0.01-1.0): Overlap filtering, default=0.05
+- `imgsz` (int, 640-3200): Processing size, default=1024
+- `normalized_coordinates` (bool): Return 0-1 coordinates instead of pixels, default=false
 
-**Features:**
-- 🎨 Professional annotations
-- 🎯 896px sweet spot for accuracy
-- ⚖️ Balanced speed vs quality
-- 🔄 Proper scaling and contrast
+**Trade-offs**: Professional styling, maximum element coverage, balanced speed
 
-### 4. `/process_image` 🔍 **COMPLETE**
+### 3. `/detect_elements_pro` - ⚖️ Balanced Detection
 
-**Full pipeline with OCR and AI captioning**
+**Speed**: 2-3 seconds | **Accuracy**: Very Good | **Best for**: Business applications
 
 **Parameters:**
-- `box_threshold` (float): 0.01-1.0, default=0.05
-- `iou_threshold` (float): 0.01-1.0, default=0.1
-- `use_paddleocr` (bool): default=True
-- `imgsz` (int): 640-3200, default=1920
-- `icon_process_batch_size` (int): 1-256, default=64
+- `image_file` (file, required): Image to process
+- `box_threshold` (float, 0.01-1.0): Confidence threshold, default=0.05
+- `iou_threshold` (float, 0.01-1.0): Overlap filtering, default=0.15
+- `imgsz` (int, 640-3200): Processing size, default=896
+- `normalized_coordinates` (bool): Return 0-1 coordinates instead of pixels, default=false
 
-**Features:**
-- 📝 Full OCR text extraction
-- 🤖 AI-generated element descriptions
-- 🎯 Highest accuracy
-- ⏱️ Slowest (30-60 seconds)
+**Trade-offs**: Speed/accuracy balance, professional coordinate scaling
+
+### 4. `/detect_elements_ultra` - 🔥 Multi-Pass Detection
+
+**Speed**: 3-5 seconds | **Accuracy**: Excellent | **Best for**: Complex UIs
+
+**Parameters:**
+- `image_file` (file, required): Image to process
+- `box_threshold` (float, 0.01-1.0): Confidence threshold, default=0.03
+- `iou_threshold` (float, 0.01-1.0): Overlap filtering, default=0.2
+- `imgsz` (int, 640-3200): Processing size, default=1280
+- `normalized_coordinates` (bool): Return 0-1 coordinates instead of pixels, default=false
+
+**Trade-offs**: Multi-pass YOLO, advanced filtering, complex interface handling
+
+### 5. `/detect_elements_accurate` - 🎯 High-Accuracy Detection
+
+**Speed**: 5-10 seconds | **Accuracy**: Highest | **Best for**: Critical applications
+
+**Parameters:**
+- `image_file` (file, required): Image to process
+- `box_threshold` (float, 0.01-1.0): Confidence threshold, default=0.05
+- `iou_threshold` (float, 0.01-1.0): Overlap filtering, default=0.1
+- `use_paddleocr` (bool): OCR engine choice, default=true
+- `imgsz` (int, 640-3200): Processing size, default=1920
+- `normalized_coordinates` (bool): Return 0-1 coordinates instead of pixels, default=false
+
+**Trade-offs**: Highest accuracy, OCR integration, professional annotations
+
+### 6. `/process_image` - 📝 Full Processing Pipeline
+
+**Speed**: 30-60 seconds | **Accuracy**: Maximum | **Best for**: AI/ML workflows
+
+**Parameters:**
+- `image_file` (file, required): Image to process
+- `box_threshold` (float, 0.01-1.0): Confidence threshold, default=0.05
+- `iou_threshold` (float, 0.01-1.0): Overlap filtering, default=0.1
+- `use_paddleocr` (bool): OCR engine choice, default=true
+- `imgsz` (int, 640-3200): Processing size, default=1920
+- `icon_process_batch_size` (int, 1-256): AI captioning batch size, default=64
+- `normalized_coordinates` (bool): Return 0-1 coordinates instead of pixels, default=false
+
+**Trade-offs**: Complete AI pipeline, text extraction, semantic understanding
 
 ## ⚖️ Speed vs Accuracy Guide
 
@@ -358,6 +401,12 @@ imgsz: 1024
 
 ### Response Format
 
+#### ✅ **Important: API Returns Native JSON Objects**
+
+The API returns **standard JSON objects** that can be parsed directly by any programming language. **No manual JSON string parsing is required.**
+
+⚠️ **Note**: If you see malformed output in terminal when using raw `curl`, that's due to terminal display limitations, not the API response format.
+
 #### Detection Endpoints Response
 
 ```json
@@ -376,6 +425,56 @@ imgsz: 1024
     }
   ]
 }
+```
+
+#### ✅ **Correct Usage Examples**
+
+**Python:**
+```python
+response = requests.post(url, files=files, data=data)
+result = response.json()  # Direct JSON object access
+elements = result['elements']  # Native list, no parsing needed
+```
+
+**Python with Normalized Coordinates:**
+```python
+data = {'normalized_coordinates': 'true'}
+response = requests.post(url, files=files, data=data)
+result = response.json()
+elements = result['elements']
+# Coordinates will be in 0-1 range: [0.052, 0.185, 0.156, 0.370]
+```
+
+**JavaScript:**
+```javascript
+const response = await fetch(url, {method: 'POST', body: formData});
+const result = await response.json();  // Direct JSON object access
+console.log(result.elements.length);  // Native array access
+```
+
+**JavaScript with Normalized Coordinates:**
+```javascript
+const formData = new FormData();
+formData.append('image_file', imageFile);
+formData.append('normalized_coordinates', 'true');
+const response = await fetch(url, {method: 'POST', body: formData});
+const result = await response.json();
+// Coordinates will be in 0-1 range for cross-resolution compatibility
+```
+
+**cURL (for programming):**
+```bash
+curl [...] | python3 -c "import sys,json; data=json.load(sys.stdin); print(len(data['elements']))"
+```
+
+#### ❌ **Common Mistake: Don't Do This**
+
+```python
+# WRONG - Don't try to parse as JSON string
+elements = json.loads(result['elements'])  # ERROR: elements is already a list
+
+# CORRECT - Direct access
+elements = result['elements']  # This is already a native Python list
 ```
 
 #### Process Image Response
@@ -406,7 +505,7 @@ imgsz: 1024
 
 ## 💻 Code Examples
 
-### Python (requests)
+### ✅ Python (requests) - Recommended
 
 ```python
 import requests
@@ -432,11 +531,21 @@ def detect_elements(image_path, runpod_url):
         response = requests.post(url, files=files, data=data)
     
     if response.status_code == 200:
-        result = response.json()
+        # ✅ CORRECT: Direct JSON object access
+        result = response.json()  # Already a Python dict
         
-        # Get elements directly (no need to parse JSON string)
-        elements = result['elements']
-        print(f"Detected {len(elements)} elements")
+        # ✅ CORRECT: Elements is already a native Python list
+        elements = result['elements']  # No JSON parsing needed!
+        
+        print(f"✅ SUCCESS: Detected {len(elements)} elements")
+        print(f"Response type: {type(result)}")        # <class 'dict'>
+        print(f"Elements type: {type(elements)}")      # <class 'list'>
+        
+        # Print first few elements
+        for i, element in enumerate(elements[:3]):
+            bbox = element['bbox']
+            conf = element['confidence']
+            print(f"Element {i}: bbox={bbox}, confidence={conf:.3f}")
         
         # Save annotated image
         image_data = base64.b64decode(result['annotated_image_base64'])
@@ -445,17 +554,26 @@ def detect_elements(image_path, runpod_url):
         
         return elements
     else:
-        print(f"Error: {response.status_code} - {response.text}")
+        print(f"❌ Error: {response.status_code} - {response.text}")
         return None
 
-# Usage
-elements = detect_elements(
-    'screenshot.png', 
-    'https://your-runpod-url.proxy.runpod.net'
-)
+# Usage example
+if __name__ == "__main__":
+    elements = detect_elements(
+        'screenshot.png', 
+        'https://c2yfcdc14566pt-7860.proxy.runpod.net'
+    )
+    
+    if elements:
+        print(f"\n🎯 Found {len(elements)} interactive elements:")
+        for element in elements[:10]:  # Show first 10
+            x1, y1, x2, y2 = element['bbox']
+            width = x2 - x1
+            height = y2 - y1
+            print(f"  Element {element['id']}: {width:.0f}x{height:.0f} at ({x1:.0f}, {y1:.0f})")
 ```
 
-### JavaScript (Node.js)
+### ✅ JavaScript (Node.js) - Recommended
 
 ```javascript
 const axios = require('axios');
@@ -481,9 +599,18 @@ async function detectElements(imagePath, runpodUrl) {
             }
         );
 
+        // ✅ CORRECT: Direct object access - already parsed JSON
         const { annotated_image_base64, elements } = response.data;
         
-        console.log(`Detected ${elements.length} elements`);
+        console.log(`✅ SUCCESS: Detected ${elements.length} elements`);
+        console.log(`Response type: ${typeof response.data}`);     // object
+        console.log(`Elements type: ${Array.isArray(elements)}`); // true
+        
+        // Print first few elements
+        elements.slice(0, 3).forEach((element, i) => {
+            const [x1, y1, x2, y2] = element.bbox;
+            console.log(`Element ${i}: bbox=[${x1}, ${y1}, ${x2}, ${y2}], confidence=${element.confidence.toFixed(3)}`);
+        });
         
         // Save annotated image
         const imageBuffer = Buffer.from(annotated_image_base64, 'base64');
@@ -491,16 +618,60 @@ async function detectElements(imagePath, runpodUrl) {
         
         return elements;
     } catch (error) {
-        console.error('Error:', error.message);
+        console.error('❌ Error:', error.message);
         return null;
     }
 }
 
-// Usage
-detectElements(
-    'screenshot.png',
-    'https://your-runpod-url.proxy.runpod.net'
-);
+// ✅ Browser Example (Fetch API)
+async function detectElementsBrowser(imageFile, runpodUrl) {
+    const formData = new FormData();
+    formData.append('image_file', imageFile);
+    formData.append('box_threshold', '0.005');
+    formData.append('iou_threshold', '0.05');
+    formData.append('imgsz', '1024');
+
+    try {
+        const response = await fetch(`${runpodUrl}/detect_elements_super`, {
+            method: 'POST',
+            body: formData
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
+        // ✅ CORRECT: Direct JSON parsing
+        const result = await response.json();  // Already a JavaScript object
+        
+        console.log(`✅ SUCCESS: Found ${result.elements.length} elements`);
+        
+        // Direct array access - no parsing needed!
+        result.elements.forEach((element, i) => {
+            if (i < 5) {  // Show first 5
+                console.log(`Element ${element.id}: confidence=${element.confidence.toFixed(3)}`);
+            }
+        });
+        
+        return result.elements;
+    } catch (error) {
+        console.error('❌ Error:', error.message);
+        return null;
+    }
+}
+
+// Usage examples
+(async () => {
+    // Node.js usage
+    const elements = await detectElements(
+        'screenshot.png',
+        'https://c2yfcdc14566pt-7860.proxy.runpod.net'
+    );
+    
+    if (elements) {
+        console.log(`\n🎯 Found ${elements.length} interactive elements`);
+    }
+})();
 ```
 
 ### cURL
@@ -672,6 +843,42 @@ results = asyncio.run(process_images_batch(['img1.png', 'img2.png'], runpod_url)
 
 ## 🔧 Troubleshooting
 
+### ⚠️ JSON Format Confusion (IMPORTANT)
+
+**Issue**: "The API returns malformed JSON with nested strings"
+
+**✅ Solution**: The API returns **native JSON objects** - you might be looking at it wrong.
+
+**What you might see in terminal:**
+```bash
+# This looks "malformed" but it's actually correct!
+curl [...] 
+# Output: ...,"confidence":0.005161285400390625}]}%
+```
+
+**Why this happens:**
+- ✅ **Terminal display limitation** - Long responses get truncated
+- ✅ **Shell prompt** - The `%` is your shell prompt, not malformed JSON
+- ✅ **The API is working correctly** - It's a display issue, not an API issue
+
+**✅ Correct way to test:**
+```bash
+# Test JSON validity
+curl [...] | python3 -c "import sys,json; data=json.load(sys.stdin); print('✅ Valid JSON!'); print(f'Keys: {list(data.keys())}'); print(f'Elements: {len(data[\"elements\"])}')"
+
+# Output should be:
+# ✅ Valid JSON!
+# Keys: ['annotated_image_base64', 'elements']
+# Elements: 99
+```
+
+**✅ Use in your code (not terminal):**
+```python
+# This works perfectly - no parsing needed
+result = response.json()  # Already a dict
+elements = result['elements']  # Already a list
+```
+
 ### Common Issues
 
 **Issue**: "Connection failed"
@@ -746,3 +953,87 @@ def debug_detection(image_path, runpod_url):
 ---
 
 **🎯 Ready to start? Use `/detect_elements_super` for the best balance of speed and quality!**
+
+## 📐 Coordinate System
+
+### Pixel Coordinates (Default)
+**Format**: `[x1, y1, x2, y2]` in pixels
+- `x1, y1`: Top-left corner coordinates  
+- `x2, y2`: Bottom-right corner coordinates
+- Values range from 0 to image width/height
+
+**Example** (1920x1080 image):
+```json
+{
+  "id": 0,
+  "bbox": [100, 200, 300, 400],
+  "confidence": 0.85
+}
+```
+
+### Normalized Coordinates (`normalized_coordinates=true`)
+**Format**: `[x1, y1, x2, y2]` in 0-1 range
+- `x1, y1`: Top-left corner coordinates (normalized)
+- `x2, y2`: Bottom-right corner coordinates (normalized)  
+- Values range from 0.0 to 1.0
+
+**Example** (same element as above):
+```json
+{
+  "id": 0,
+  "bbox": [0.052, 0.185, 0.156, 0.370],
+  "confidence": 0.85
+}
+```
+
+### 🎯 When to Use Normalized Coordinates
+
+**Use `normalized_coordinates=true` for:**
+- **Machine Learning pipelines** - Model training/inference
+- **Automation scripts** - Cross-resolution compatibility  
+- **Mathematical computations** - Easier calculations
+- **Multi-device workflows** - Consistent across screen sizes
+- **Data analysis** - Statistical processing
+
+**Use `normalized_coordinates=false` (default) for:**
+- **UI automation** - Direct pixel clicking
+- **Manual verification** - Human-readable coordinates
+- **Legacy systems** - Existing pixel-based workflows
+- **Visual debugging** - Direct coordinate mapping
+
+### 💡 Practical Example
+
+**Converting between coordinate systems:**
+```python
+import requests
+
+# Get normalized coordinates
+data = {'normalized_coordinates': 'true'}
+response = requests.post(url, files=files, data=data)
+result = response.json()
+
+# Convert back to pixels for a 1920x1080 image
+for element in result['elements']:
+    x1_norm, y1_norm, x2_norm, y2_norm = element['bbox']
+    
+    # Convert to pixels
+    x1_pixel = int(x1_norm * 1920)  # x1_norm * image_width
+    y1_pixel = int(y1_norm * 1080)  # y1_norm * image_height
+    x2_pixel = int(x2_norm * 1920)  # x2_norm * image_width  
+    y2_pixel = int(y2_norm * 1080)  # y2_norm * image_height
+    
+    print(f"Element {element['id']}: [{x1_pixel}, {y1_pixel}, {x2_pixel}, {y2_pixel}]")
+```
+
+**Cross-resolution automation:**
+```python
+# Train on 1920x1080, deploy on 1366x768
+normalized_coords = [0.052, 0.185, 0.156, 0.370]  # From training
+
+# Deploy on different resolution
+target_width, target_height = 1366, 768
+x1 = int(normalized_coords[0] * target_width)   # 71 pixels
+y1 = int(normalized_coords[1] * target_height)  # 142 pixels
+x2 = int(normalized_coords[2] * target_width)   # 213 pixels  
+y2 = int(normalized_coords[3] * target_height)  # 284 pixels
+```

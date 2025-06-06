@@ -70,6 +70,7 @@ def detect_fast(
     box_threshold,
     iou_threshold,
     imgsz,
+    normalized_coordinates: Annotated[bool, Query()] = False,  # Return 0-1 coordinates instead of pixels
 ) -> Optional[DetectResponse]:
     """EXTREME SPEED: Target <1 second response time"""
     
@@ -211,15 +212,28 @@ def detect_fast(
     # Create elements list in new format
     elements_list = []
     for i, (box, conf) in enumerate(zip(boxes, confidences)):
+        if normalized_coordinates:
+            # Normalize coordinates to 0-1 range
+            bbox = [
+                float(box[0]) / original_width,   # x1 normalized
+                float(box[1]) / original_height,  # y1 normalized  
+                float(box[2]) / original_width,   # x2 normalized
+                float(box[3]) / original_height   # y2 normalized
+            ]
+        else:
+            # Keep pixel coordinates
+            bbox = [float(box[0]), float(box[1]), float(box[2]), float(box[3])]
+        
         elements_list.append({
             "id": i,
-            "bbox": [float(box[0]), float(box[1]), float(box[2]), float(box[3])],
+            "bbox": bbox,
             "confidence": float(conf)
         })
     
     total_time = time.time() - start_time
     print(f"🚀 TOTAL TIME: {total_time:.3f}s")
     print(f"🎯 DETECTED: {len(boxes)} elements")
+    print(f"📐 COORDINATES: {'Normalized (0-1)' if normalized_coordinates else 'Pixels'}")
     
     return DetectResponse(
         annotated_image_base64=img_str,
@@ -232,6 +246,7 @@ def detect_fast_pro(
     box_threshold,
     iou_threshold,
     imgsz,
+    normalized_coordinates: Annotated[bool, Query()] = False,  # Return 0-1 coordinates instead of pixels
 ) -> Optional[DetectResponse]:
     """HYBRID APPROACH: Professional quality + optimized speed"""
     
@@ -414,15 +429,28 @@ def detect_fast_pro(
     # Create elements list in new format
     elements_list = []
     for i, (box, conf) in enumerate(zip(boxes, confidences)):
+        if normalized_coordinates:
+            # Normalize coordinates to 0-1 range
+            bbox = [
+                float(box[0]) / original_width,   # x1 normalized
+                float(box[1]) / original_height,  # y1 normalized  
+                float(box[2]) / original_width,   # x2 normalized
+                float(box[3]) / original_height   # y2 normalized
+            ]
+        else:
+            # Keep pixel coordinates
+            bbox = [float(box[0]), float(box[1]), float(box[2]), float(box[3])]
+        
         elements_list.append({
             "id": i,
-            "bbox": [float(box[0]), float(box[1]), float(box[2]), float(box[3])],
+            "bbox": bbox,
             "confidence": float(conf)
         })
     
     total_time = time.time() - start_time
     print(f"🚀 TOTAL TIME (PRO): {total_time:.3f}s")
     print(f"🎯 DETECTED: {len(boxes)} elements")
+    print(f"📐 COORDINATES: {'Normalized (0-1)' if normalized_coordinates else 'Pixels'}")
     print(f"📏 SCALE FACTOR: {scale_factor:.3f}")
     
     return DetectResponse(
@@ -439,6 +467,7 @@ def process(
     use_paddleocr,
     imgsz,
     icon_process_batch_size,
+    normalized_coordinates: Annotated[bool, Query()] = False,  # Return 0-1 coordinates instead of pixels
 ) -> Optional[ProcessResponse]:
     image_save_path = 'imgs/saved_image_demo.png'
     image_input.save(image_save_path)
@@ -478,6 +507,7 @@ def detect_fast_accurate(
     iou_threshold,
     use_paddleocr,
     imgsz,
+    normalized_coordinates: Annotated[bool, Query()] = False,  # Return 0-1 coordinates instead of pixels
 ) -> Optional[DetectResponse]:
     """ACCURATE FAST: Same pipeline as process_image but without AI captioning"""
     
@@ -553,8 +583,11 @@ def detect_fast_accurate(
     decode_time = time.time() - image_decode_start
     print(f"📦 Image processing: {decode_time:.3f}s")
     
-    # STEP 4: Create elements list from label_coordinates
+    # STEP 4: Create elements list from label_coordinates with optional normalization
     elements_list = []
+    
+    # Get original image dimensions for normalization
+    original_width, original_height = image_input.size
     
     # Parse the label_coordinates which comes as a dict like {'0': [x, y, w, h], '1': [x, y, w, h]}
     if isinstance(label_coordinates, dict):
@@ -565,9 +598,21 @@ def detect_fast_accurate(
                 x1, y1 = x, y
                 x2, y2 = x + w, y + h
                 
+                if normalized_coordinates:
+                    # Normalize coordinates to 0-1 range
+                    bbox = [
+                        float(x1) / original_width,   # x1 normalized
+                        float(y1) / original_height,  # y1 normalized  
+                        float(x2) / original_width,   # x2 normalized
+                        float(y2) / original_height   # y2 normalized
+                    ]
+                else:
+                    # Keep pixel coordinates
+                    bbox = [float(x1), float(y1), float(x2), float(y2)]
+                
                 elements_list.append({
                     "id": i,
-                    "bbox": [float(x1), float(y1), float(x2), float(y2)],
+                    "bbox": bbox,
                     "confidence": 0.95  # High confidence since this passed all filters
                 })
     
@@ -576,6 +621,7 @@ def detect_fast_accurate(
     print(f"🎯 DETECTED: {len(elements_list)} elements")
     print(f"📝 OCR elements: {len(text)}")
     print(f"🎨 Visual elements: {len(elements_list) - len(text)}")
+    print(f"📐 COORDINATES: {'Normalized (0-1)' if normalized_coordinates else 'Pixels'}")
     
     return DetectResponse(
         annotated_image_base64=img_str,
@@ -588,6 +634,7 @@ def detect_fast_ultra(
     box_threshold,
     iou_threshold,
     imgsz,
+    normalized_coordinates: Annotated[bool, Query()] = False,  # Return 0-1 coordinates instead of pixels
 ) -> Optional[DetectResponse]:
     """ULTRA FAST: High accuracy without OCR using optimized YOLO techniques"""
     
@@ -786,15 +833,28 @@ def detect_fast_ultra(
     # Create elements list in new format
     elements_list = []
     for i, (box, conf) in enumerate(zip(filtered_boxes, filtered_confidences)):
+        if normalized_coordinates:
+            # Normalize coordinates to 0-1 range
+            bbox = [
+                float(box[0]) / original_width,   # x1 normalized
+                float(box[1]) / original_height,  # y1 normalized  
+                float(box[2]) / original_width,   # x2 normalized
+                float(box[3]) / original_height   # y2 normalized
+            ]
+        else:
+            # Keep pixel coordinates
+            bbox = [float(box[0]), float(box[1]), float(box[2]), float(box[3])]
+        
         elements_list.append({
             "id": i,
-            "bbox": [float(box[0]), float(box[1]), float(box[2]), float(box[3])],
+            "bbox": bbox,
             "confidence": float(conf)
         })
     
     total_time = time.time() - start_time
     print(f"🚀 TOTAL TIME (ULTRA): {total_time:.3f}s")
     print(f"🎯 DETECTED: {len(elements_list)} elements")
+    print(f"📐 COORDINATES: {'Normalized (0-1)' if normalized_coordinates else 'Pixels'}")
     print(f"⚡ SPEED BREAKDOWN: Inference={inference_time:.3f}s, Filter={filtering_time:.3f}s, Annotate={annotation_time:.3f}s, Encode={encoding_time:.3f}s")
     
     return DetectResponse(
@@ -808,6 +868,7 @@ def detect_fast_super(
     box_threshold,
     iou_threshold,
     imgsz,
+    normalized_coordinates: Annotated[bool, Query()] = False,  # Return 0-1 coordinates instead of pixels
 ) -> Optional[DetectResponse]:
     """SUPER FAST: Single-pass YOLO with extreme optimization for <3s response"""
     
@@ -1021,12 +1082,24 @@ def detect_fast_super(
     encoding_time = time.time() - encoding_start
     print(f"📦 Fast encoding: {encoding_time:.3f}s")
     
-    # Create elements list in new format
+    # Create elements list with optional coordinate normalization
     elements_list = []
     for i, (box, conf) in enumerate(zip(filtered_boxes, filtered_confidences)):
+        if normalized_coordinates:
+            # Normalize coordinates to 0-1 range
+            bbox = [
+                float(box[0]) / original_width,   # x1 normalized
+                float(box[1]) / original_height,  # y1 normalized  
+                float(box[2]) / original_width,   # x2 normalized
+                float(box[3]) / original_height   # y2 normalized
+            ]
+        else:
+            # Keep pixel coordinates
+            bbox = [float(box[0]), float(box[1]), float(box[2]), float(box[3])]
+        
         elements_list.append({
             "id": i,
-            "bbox": [float(box[0]), float(box[1]), float(box[2]), float(box[3])],
+            "bbox": bbox,
             "confidence": float(conf)
         })
     
@@ -1046,6 +1119,7 @@ async def detect_elements(
     box_threshold: Annotated[float, Query(ge=0.01, le=1.0)] = 0.01,  # Ultra-low for max detections
     iou_threshold: Annotated[float, Query(ge=0.01, le=1.0)] = 0.3,   # High for more overlaps
     imgsz: Annotated[int, Query(ge=640, le=3200)] = 640,  # Force smallest size for speed
+    normalized_coordinates: Annotated[bool, Query()] = False,  # Return 0-1 coordinates instead of pixels
 ):
     """
     🚀 EXTREME SPEED: Target <1 second response time
@@ -1069,7 +1143,7 @@ async def detect_elements(
     except Exception as e:
         raise HTTPException(status_code=400, detail="Invalid image file")
 
-    response = detect_fast(image_input, box_threshold, iou_threshold, imgsz)
+    response = detect_fast(image_input, box_threshold, iou_threshold, imgsz, normalized_coordinates)
     return response
 
 @app.post("/detect_elements_pro", response_model=DetectResponse)
@@ -1078,6 +1152,7 @@ async def detect_elements_pro(
     box_threshold: Annotated[float, Query(ge=0.01, le=1.0)] = 0.05,  # Balanced threshold
     iou_threshold: Annotated[float, Query(ge=0.01, le=1.0)] = 0.15,  # Balanced filtering
     imgsz: Annotated[int, Query(ge=640, le=3200)] = 896,  # Sweet spot for speed vs accuracy
+    normalized_coordinates: Annotated[bool, Query()] = False,  # Return 0-1 coordinates instead of pixels
 ):
     """
     🎯 PROFESSIONAL FAST: High-quality annotations + good speed
@@ -1102,7 +1177,7 @@ async def detect_elements_pro(
     except Exception as e:
         raise HTTPException(status_code=400, detail="Invalid image file")
 
-    response = detect_fast_pro(image_input, box_threshold, iou_threshold, imgsz)
+    response = detect_fast_pro(image_input, box_threshold, iou_threshold, imgsz, normalized_coordinates)
     return response
 
 @app.post("/process_image", response_model=ProcessResponse)
@@ -1113,6 +1188,7 @@ async def process_image(
     use_paddleocr: Annotated[bool, Query()] = True,
     imgsz: Annotated[int, Query(ge=640, le=3200)] = 1920,
     icon_process_batch_size: Annotated[int, Query(ge=1, le=256)] = 64,
+    normalized_coordinates: Annotated[bool, Query()] = False,  # Return 0-1 coordinates instead of pixels
 ):
     """
     🔍 FULL: Process an image with complete OCR and AI captioning (slower but detailed)
@@ -1131,7 +1207,7 @@ async def process_image(
     except Exception as e:
         raise HTTPException(status_code=400, detail="Invalid image file")
 
-    response = process(image_input, box_threshold, iou_threshold, use_paddleocr, imgsz, icon_process_batch_size)
+    response = process(image_input, box_threshold, iou_threshold, use_paddleocr, imgsz, icon_process_batch_size, normalized_coordinates)
     return response
 
 @app.post("/detect_elements_accurate", response_model=DetectResponse)
@@ -1141,6 +1217,7 @@ async def detect_elements_accurate(
     iou_threshold: Annotated[float, Query(ge=0.01, le=1.0)] = 0.1,   # Same as process_image  
     use_paddleocr: Annotated[bool, Query()] = True,  # OCR engine choice
     imgsz: Annotated[int, Query(ge=640, le=3200)] = 1920,  # Same as process_image
+    normalized_coordinates: Annotated[bool, Query()] = False,  # Return 0-1 coordinates instead of pixels
 ):
     """
     🎯 ACCURATE FAST: Same pipeline as process_image but optimized for speed
@@ -1167,7 +1244,7 @@ async def detect_elements_accurate(
     except Exception as e:
         raise HTTPException(status_code=400, detail="Invalid image file")
 
-    response = detect_fast_accurate(image_input, box_threshold, iou_threshold, use_paddleocr, imgsz)
+    response = detect_fast_accurate(image_input, box_threshold, iou_threshold, use_paddleocr, imgsz, normalized_coordinates)
     return response
 
 @app.post("/detect_elements_ultra", response_model=DetectResponse)
@@ -1176,24 +1253,15 @@ async def detect_elements_ultra(
     box_threshold: Annotated[float, Query(ge=0.01, le=1.0)] = 0.03,  # Balanced for multi-pass
     iou_threshold: Annotated[float, Query(ge=0.01, le=1.0)] = 0.2,   # Balanced filtering
     imgsz: Annotated[int, Query(ge=640, le=3200)] = 1280,  # Speed/accuracy sweet spot
+    normalized_coordinates: Annotated[bool, Query()] = False,  # Return 0-1 coordinates instead of pixels
 ):
     """
-    ⚡ ULTRA FAST: High accuracy without OCR using advanced YOLO techniques
-    
-    Revolutionary approach for maximum speed + accuracy:
-    - 🚀 Multi-pass YOLO inference (2 passes with different parameters)
-    - 🎯 Advanced NMS filtering (better than basic IOU)
-    - 🎨 Professional annotations (same quality as process_image)
-    - ⚡ NO OCR (eliminates the biggest speed bottleneck)
-    - 🔥 Target: <3 seconds with excellent element detection
-    
-    Should catch Chrome tabs, buttons, and UI elements through optimized YOLO only!
-    
-    Args:
-        image_file (UploadFile): The image file to process
-        box_threshold (float): Base confidence threshold, default=0.03
-        iou_threshold (float): Overlap filtering threshold, default=0.2
-        imgsz (int): Max inference size, default=1280 (optimized for speed)
+    🔥 MULTI-PASS ULTRA DETECTION: Advanced YOLO processing for complex UIs (3-5s)
+    - Multi-pass YOLO inference with different scales
+    - Advanced overlap removal and confidence merging
+    - Optimized for complex interfaces with many elements
+    - Professional color-coded annotations
+    - Optional normalized coordinates (0-1 range)
     """
     try:
         contents = await image_file.read()
@@ -1201,7 +1269,7 @@ async def detect_elements_ultra(
     except Exception as e:
         raise HTTPException(status_code=400, detail="Invalid image file")
 
-    response = detect_fast_ultra(image_input, box_threshold, iou_threshold, imgsz)
+    response = detect_fast_ultra(image_input, box_threshold, iou_threshold, imgsz, normalized_coordinates)
     return response
 
 @app.post("/detect_elements_super", response_model=DetectResponse)
@@ -1210,24 +1278,20 @@ async def detect_elements_super(
     box_threshold: Annotated[float, Query(ge=0.001, le=1.0)] = 0.005,  # Very low for max coverage
     iou_threshold: Annotated[float, Query(ge=0.01, le=1.0)] = 0.05,   # Very low IOU
     imgsz: Annotated[int, Query(ge=640, le=3200)] = 1024,  # Balanced for speed
+    normalized_coordinates: Annotated[bool, Query()] = False,  # Return 0-1 coordinates instead of pixels
 ):
     """
-    💥 SUPER FAST: Single-pass optimized YOLO for maximum speed + accuracy
+    🚀 SUPER-FAST DETECTION: Professional styling + maximum element coverage (3-5s)
+    - Professional box annotations with color palette
+    - Very low thresholds for maximum element detection
+    - Balanced image size for speed vs accuracy
+    - Optional normalized coordinates (0-1 range) for ML/automation workflows
     
-    Extreme single-pass optimization targeting <3 seconds:
-    - 🚀 Single YOLO pass (no multi-pass overhead)
-    - ⚡ JPEG processing for speed
-    - 🎯 Ultra-low thresholds (0.005 confidence, 0.05 IOU)
-    - 💨 Fast overlap removal (not complex NMS)
-    - 🔥 Target: <3 seconds with 100+ elements
-    
-    Should be faster than ultra while catching more elements!
-    
-    Args:
-        image_file (UploadFile): The image file to process
-        box_threshold (float): Confidence threshold, default=0.005 (ultra-low)
-        iou_threshold (float): Overlap threshold, default=0.05 (very low)
-        imgsz (int): Max inference size, default=1024 (speed optimized)
+    Use normalized_coordinates=true for:
+    - Machine learning pipelines
+    - Automation scripts
+    - Cross-resolution compatibility
+    - Mathematical computations
     """
     try:
         contents = await image_file.read()
@@ -1235,5 +1299,5 @@ async def detect_elements_super(
     except Exception as e:
         raise HTTPException(status_code=400, detail="Invalid image file")
 
-    response = detect_fast_super(image_input, box_threshold, iou_threshold, imgsz)
+    response = detect_fast_super(image_input, box_threshold, iou_threshold, imgsz, normalized_coordinates)
     return response
