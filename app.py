@@ -2,7 +2,7 @@ import os
 
 from fastapi import FastAPI, File, UploadFile, HTTPException, Query
 from pydantic import BaseModel
-from typing import Optional, Annotated
+from typing import Optional, Annotated, List
 import io
 import json
 
@@ -61,8 +61,8 @@ class ProcessResponse(BaseModel):
     label_coordinates: str
 
 class DetectResponse(BaseModel):
-    image: str  # Base64 encoded image with bounding boxes
-    coordinates: str  # JSON string of coordinates
+    annotated_image_base64: str  # Base64 encoded image with bounding boxes
+    elements: List[dict]  # List of detected elements with id, bbox, confidence
 
 @torch.inference_mode()
 def detect_fast(
@@ -208,10 +208,10 @@ def detect_fast(
     encoding_time = time.time() - encoding_start
     print(f"📦 Encoding: {encoding_time:.3f}s")
     
-    # Create coordinates list
-    coordinates_list = []
+    # Create elements list in new format
+    elements_list = []
     for i, (box, conf) in enumerate(zip(boxes, confidences)):
-        coordinates_list.append({
+        elements_list.append({
             "id": i,
             "bbox": [float(box[0]), float(box[1]), float(box[2]), float(box[3])],
             "confidence": float(conf)
@@ -222,8 +222,8 @@ def detect_fast(
     print(f"🎯 DETECTED: {len(boxes)} elements")
     
     return DetectResponse(
-        image=img_str,
-        coordinates=json.dumps(coordinates_list)
+        annotated_image_base64=img_str,
+        elements=elements_list
     )
 
 @torch.inference_mode()
@@ -411,10 +411,10 @@ def detect_fast_pro(
     encoding_time = time.time() - encoding_start
     print(f"📦 Encoding: {encoding_time:.3f}s")
     
-    # Create precise coordinates list
-    coordinates_list = []
+    # Create elements list in new format
+    elements_list = []
     for i, (box, conf) in enumerate(zip(boxes, confidences)):
-        coordinates_list.append({
+        elements_list.append({
             "id": i,
             "bbox": [float(box[0]), float(box[1]), float(box[2]), float(box[3])],
             "confidence": float(conf)
@@ -426,8 +426,8 @@ def detect_fast_pro(
     print(f"📏 SCALE FACTOR: {scale_factor:.3f}")
     
     return DetectResponse(
-        image=img_str,
-        coordinates=json.dumps(coordinates_list)
+        annotated_image_base64=img_str,
+        elements=elements_list
     )
 
 @torch.inference_mode()
@@ -553,8 +553,8 @@ def detect_fast_accurate(
     decode_time = time.time() - image_decode_start
     print(f"📦 Image processing: {decode_time:.3f}s")
     
-    # STEP 4: Create coordinates list from label_coordinates
-    coordinates_list = []
+    # STEP 4: Create elements list from label_coordinates
+    elements_list = []
     
     # Parse the label_coordinates which comes as a dict like {'0': [x, y, w, h], '1': [x, y, w, h]}
     if isinstance(label_coordinates, dict):
@@ -565,7 +565,7 @@ def detect_fast_accurate(
                 x1, y1 = x, y
                 x2, y2 = x + w, y + h
                 
-                coordinates_list.append({
+                elements_list.append({
                     "id": i,
                     "bbox": [float(x1), float(y1), float(x2), float(y2)],
                     "confidence": 0.95  # High confidence since this passed all filters
@@ -573,13 +573,13 @@ def detect_fast_accurate(
     
     total_time = time.time() - start_time
     print(f"🚀 TOTAL TIME (ACCURATE): {total_time:.3f}s")
-    print(f"🎯 DETECTED: {len(coordinates_list)} elements")
+    print(f"🎯 DETECTED: {len(elements_list)} elements")
     print(f"📝 OCR elements: {len(text)}")
-    print(f"🎨 Visual elements: {len(coordinates_list) - len(text)}")
+    print(f"🎨 Visual elements: {len(elements_list) - len(text)}")
     
     return DetectResponse(
-        image=img_str,
-        coordinates=json.dumps(coordinates_list)
+        annotated_image_base64=img_str,
+        elements=elements_list
     )
 
 @torch.inference_mode()
@@ -783,10 +783,10 @@ def detect_fast_ultra(
     encoding_time = time.time() - encoding_start
     print(f"📦 Encoding: {encoding_time:.3f}s")
     
-    # Create coordinates list
-    coordinates_list = []
+    # Create elements list in new format
+    elements_list = []
     for i, (box, conf) in enumerate(zip(filtered_boxes, filtered_confidences)):
-        coordinates_list.append({
+        elements_list.append({
             "id": i,
             "bbox": [float(box[0]), float(box[1]), float(box[2]), float(box[3])],
             "confidence": float(conf)
@@ -794,12 +794,12 @@ def detect_fast_ultra(
     
     total_time = time.time() - start_time
     print(f"🚀 TOTAL TIME (ULTRA): {total_time:.3f}s")
-    print(f"🎯 DETECTED: {len(coordinates_list)} elements")
+    print(f"🎯 DETECTED: {len(elements_list)} elements")
     print(f"⚡ SPEED BREAKDOWN: Inference={inference_time:.3f}s, Filter={filtering_time:.3f}s, Annotate={annotation_time:.3f}s, Encode={encoding_time:.3f}s")
     
     return DetectResponse(
-        image=img_str,
-        coordinates=json.dumps(coordinates_list)
+        annotated_image_base64=img_str,
+        elements=elements_list
     )
 
 @torch.inference_mode()
@@ -1021,10 +1021,10 @@ def detect_fast_super(
     encoding_time = time.time() - encoding_start
     print(f"📦 Fast encoding: {encoding_time:.3f}s")
     
-    # Create coordinates list
-    coordinates_list = []
+    # Create elements list in new format
+    elements_list = []
     for i, (box, conf) in enumerate(zip(filtered_boxes, filtered_confidences)):
-        coordinates_list.append({
+        elements_list.append({
             "id": i,
             "bbox": [float(box[0]), float(box[1]), float(box[2]), float(box[3])],
             "confidence": float(conf)
@@ -1032,12 +1032,12 @@ def detect_fast_super(
     
     total_time = time.time() - start_time
     print(f"🚀 TOTAL TIME (SUPER): {total_time:.3f}s")
-    print(f"🎯 DETECTED: {len(coordinates_list)} elements")
+    print(f"🎯 DETECTED: {len(elements_list)} elements")
     print(f"⚡ BREAKDOWN: Inference={inference_time:.3f}s, Process={processing_time:.3f}s, Annotate={annotation_time:.3f}s, Encode={encoding_time:.3f}s")
     
     return DetectResponse(
-        image=img_str,
-        coordinates=json.dumps(coordinates_list)
+        annotated_image_base64=img_str,
+        elements=elements_list
     )
 
 @app.post("/detect_elements", response_model=DetectResponse)
