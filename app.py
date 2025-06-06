@@ -907,9 +907,11 @@ def detect_fast_super(
     inference_start = time.time()
     
     # CRITICAL: Use optimized parameters for both speed AND accuracy
+    # Use the actual resized image dimensions to avoid double scaling
+    actual_imgsz = new_width if scale_factor != 1.0 else 896
     results = yolo_model(
         image_save_path,
-        imgsz=896,  # Reduced from 1024 for speed
+        imgsz=actual_imgsz,  # Use actual image size to avoid double scaling
         conf=0.005,  # VERY low threshold to catch everything
         iou=0.05,   # Very low IOU to keep more detections
         verbose=False,
@@ -933,6 +935,9 @@ def detect_fast_super(
         for box, conf in zip(boxes_tensor, conf_tensor):
             x1, y1, x2, y2 = box.tolist()
             
+            # DEBUG: Log the raw YOLO coordinates 
+            print(f"🐛 DEBUG: Raw YOLO box: [{x1:.3f}, {y1:.3f}, {x2:.3f}, {y2:.3f}], scale_factor: {scale_factor:.3f}")
+            
             # Scale back to original coordinates
             if scale_factor != 1.0:
                 x1_orig = x1 / scale_factor
@@ -941,6 +946,8 @@ def detect_fast_super(
                 y2_orig = y2 / scale_factor
             else:
                 x1_orig, y1_orig, x2_orig, y2_orig = x1, y1, x2, y2
+            
+            print(f"🐛 DEBUG: Scaled box: [{x1_orig:.3f}, {y1_orig:.3f}, {x2_orig:.3f}, {y2_orig:.3f}]")
             
             # Ensure coordinates are within bounds
             x1_orig = max(0, min(x1_orig, original_width))
