@@ -83,7 +83,7 @@ def detect_fast(
     
     # Convert directly to numpy (skip file I/O completely)
     image_np = np.array(image_input)
-    original_height, original_width = image_np.shape[:2]
+    original_width, original_height = image_input.size  # Use PIL Image.size for correct width/height order
     
     # EXTREME OPTIMIZATION 2: Aggressive size reduction for speed
     # Force much smaller inference size for near-instant results
