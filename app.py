@@ -885,6 +885,9 @@ def detect_fast_super(
     original_width, original_height = image_input.size
     
     # SPEED HACK 2: Aggressive but smart sizing
+    new_width = original_width
+    new_height = original_height
+    
     if original_width > 1280 or original_height > 720:
         # Force smaller size for large images - MORE AGGRESSIVE
         scale = min(896 / original_width, 640 / original_height)  # Reduced from 1280x720
@@ -908,7 +911,7 @@ def detect_fast_super(
     
     # CRITICAL: Use optimized parameters for both speed AND accuracy
     # Use the actual resized image dimensions to avoid double scaling
-    actual_imgsz = new_width if scale_factor != 1.0 else 896
+    actual_imgsz = max(new_width, new_height)  # Use the larger dimension for YOLO
     results = yolo_model(
         image_save_path,
         imgsz=actual_imgsz,  # Use actual image size to avoid double scaling
@@ -1090,6 +1093,7 @@ def detect_fast_super(
     print(f"📦 Fast encoding: {encoding_time:.3f}s")
     
     # Create elements list with optional coordinate normalization
+    print(f"🎯 Coordinate format: {'NORMALIZED (0-1)' if normalized_coordinates else 'PIXELS'} | Image: {original_width}x{original_height}")
     elements_list = []
     for i, (box, conf) in enumerate(zip(filtered_boxes, filtered_confidences)):
         if normalized_coordinates:
@@ -1100,6 +1104,8 @@ def detect_fast_super(
                 float(box[2]) / original_width,   # x2 normalized
                 float(box[3]) / original_height   # y2 normalized
             ]
+            if i == 0:  # Log first box as example
+                print(f"🐛 NORM EXAMPLE: Pixel [{box[0]:.1f}, {box[1]:.1f}, {box[2]:.1f}, {box[3]:.1f}] → Normalized [{bbox[0]:.3f}, {bbox[1]:.3f}, {bbox[2]:.3f}, {bbox[3]:.3f}]")
         else:
             # Keep pixel coordinates
             bbox = [float(box[0]), float(box[1]), float(box[2]), float(box[3])]
