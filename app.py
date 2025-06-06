@@ -70,7 +70,7 @@ def detect_fast(
     box_threshold,
     iou_threshold,
     imgsz,
-    normalized_coordinates: Annotated[bool, Query()] = False,  # Return 0-1 coordinates instead of pixels
+    normalized_coordinates: bool = False,  # Return 0-1 coordinates instead of pixels
 ) -> Optional[DetectResponse]:
     """EXTREME SPEED: Target <1 second response time"""
     
@@ -246,7 +246,7 @@ def detect_fast_pro(
     box_threshold,
     iou_threshold,
     imgsz,
-    normalized_coordinates: Annotated[bool, Query()] = False,  # Return 0-1 coordinates instead of pixels
+    normalized_coordinates: bool = False,  # Return 0-1 coordinates instead of pixels
 ) -> Optional[DetectResponse]:
     """HYBRID APPROACH: Professional quality + optimized speed"""
     
@@ -467,7 +467,7 @@ def process(
     use_paddleocr,
     imgsz,
     icon_process_batch_size,
-    normalized_coordinates: Annotated[bool, Query()] = False,  # Return 0-1 coordinates instead of pixels
+    normalized_coordinates: bool = False,  # Return 0-1 coordinates instead of pixels
 ) -> Optional[ProcessResponse]:
     image_save_path = 'imgs/saved_image_demo.png'
     image_input.save(image_save_path)
@@ -507,7 +507,7 @@ def detect_fast_accurate(
     iou_threshold,
     use_paddleocr,
     imgsz,
-    normalized_coordinates: Annotated[bool, Query()] = False,  # Return 0-1 coordinates instead of pixels
+    normalized_coordinates: bool = False,  # Return 0-1 coordinates instead of pixels
 ) -> Optional[DetectResponse]:
     """ACCURATE FAST: Same pipeline as process_image but without AI captioning"""
     
@@ -634,7 +634,7 @@ def detect_fast_ultra(
     box_threshold,
     iou_threshold,
     imgsz,
-    normalized_coordinates: Annotated[bool, Query()] = False,  # Return 0-1 coordinates instead of pixels
+    normalized_coordinates: bool = False,  # Return 0-1 coordinates instead of pixels
 ) -> Optional[DetectResponse]:
     """ULTRA FAST: High accuracy without OCR using optimized YOLO techniques"""
     
@@ -868,7 +868,7 @@ def detect_fast_super(
     box_threshold,
     iou_threshold,
     imgsz,
-    normalized_coordinates: Annotated[bool, Query()] = False,  # Return 0-1 coordinates instead of pixels
+    normalized_coordinates: bool = False,  # Return 0-1 coordinates instead of pixels
 ) -> Optional[DetectResponse]:
     """SUPER FAST: Single-pass YOLO with extreme optimization for <3s response"""
     
